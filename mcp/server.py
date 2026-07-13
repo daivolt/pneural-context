@@ -1,5 +1,5 @@
 """
-pneural-context MCP Server — exposes Paper Brain features as MCP tools for opencode.
+pneural-context MCP Server — exposes pneural-context features as MCP tools for opencode.
 
 Wraps the pneural-context REST API and provides per-feature toggle
 via PB_* environment variables. All features default to enabled.
@@ -99,14 +99,14 @@ async def api_patch(path: str, json_data: dict | None = None) -> dict:
 
 
 def disabled_msg(feature: str) -> str:
-    return f"Paper Brain feature '{feature}' is currently disabled. Set PB_{feature.upper()}=true to enable."
+    return f"pneural-context feature '{feature}' is currently disabled. Set PB_{feature.upper()}=true to enable."
 
 
 def fmt(result: dict | list) -> str:
     return json.dumps(result, indent=2, ensure_ascii=False)
 
 
-server = Server("paper-brain")
+server = Server("pneural-context")
 
 
 @server.list_tools()
@@ -117,7 +117,7 @@ async def list_tools() -> list[Tool]:
     tools.append(
         Tool(
             name="pb_help",
-            description="Get help about Paper Brain modules and tools. Returns overview or module-specific docs.",
+            description="Get help about pneural-context modules and tools. Returns overview or module-specific docs.",
             inputSchema={
                 "type": "object",
                 "properties": {

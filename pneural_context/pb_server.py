@@ -2,7 +2,7 @@
 pb_server — FastAPI server for pneural-context.
 
 Mountable as a sub-app or run standalone. Provides REST API for all
-Paper Brain operations: memory, procedures, consolidation, decay, costs, anchors, briefing.
+pneural-context operations: memory, procedures, consolidation, decay, costs, anchors, briefing.
 """
 
 import asyncio

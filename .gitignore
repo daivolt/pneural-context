@@ -13,3 +13,5 @@ venv/
 .pytest_cache/
 .ruff_cache/
 *.sqlite3
+# Reference PDFs (too large for git, use DOIs)
+docs/references/*.pdf

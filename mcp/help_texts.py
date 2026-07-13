@@ -7,9 +7,9 @@ get_help() returns the appropriate format based on module and format params.
 """
 
 HELP_OVERVIEW = """\
-# Paper Brain — Persistent Neural Context for LLMs
+# pneural-context — Persistent Neural Context for LLMs
 
-Paper Brain (pneural-context) provides memory, recall, consolidation, decay, and cost tracking
+pneural-context provides memory, recall, consolidation, decay, and cost tracking
 for LLM agents. It is designed as a standalone package with a REST API and MCP server.
 
 ## Modules
@@ -282,7 +282,7 @@ Record a cost observation. Called after context injection and on task completion
 HELPS = {
     "": (
         HELP_OVERVIEW,
-        "Paper Brain: persistent neural context. Modules: memory, recall, red_ink, briefing, procedural, typed_sections, consolidation, anchors, decay, costs",
+        "pneural-context: persistent neural context. Modules: memory, recall, red_ink, briefing, procedural, typed_sections, consolidation, anchors, decay, costs",
     ),
     "memory": (
         HELP_MEMORY,

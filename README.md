@@ -1,13 +1,51 @@
 # pneural-context
 
-> **⚠️ EXPERIMENTAL ALPHA — DO NOT USE IN PRODUCTION**
+> **⚠️ EXPERIMENTAL ALPHA — UNDER CONSTRUCTION**
 >
-> This software is in early alpha. APIs will change without notice. Things will break.
-> Data schemas may be incompatible between versions. No migration paths are guaranteed.
+> This software is in early alpha and actively under development.
+> APIs will change without notice. Things will break. Data schemas may
+> be incompatible between versions. No migration paths are guaranteed.
+> Features may be incomplete or non-functional. Use at your own risk.
 
-Persistent neural context for LLMs — memory, consolidation, decay, and recall.
+## What Is This
 
-pneural-context gives LLM agents a durable memory that outlives session death. Inspired by how human memory consolidates experiences during sleep and decays unused information over time, it provides:
+pneural-context is a persistent neural context layer for LLM agents — memory, consolidation, decay, and recall. LLMs have anterograde amnesia: every session starts from scratch, and context compaction loses information the way anterograde amnesia destroys continuity. pneural-context stores, consolidates, decays, and recalls context so an agent can recover relevant memory at the start of a new session.
+
+## Goal
+
+Give LLM agents a durable memory layer that outlives session death — so work done in one session is recoverable in the next.
+
+## Inspired By
+
+- **Junko Mizuta** — a Japanese woman who, after herpes simplex virus damaged her brain in the 2000s, was left with approximately 7 seconds of short-term memory. Documented in the CBC (Chubu-Nippon Broadcasting) documentary *Ever Vanishing Present* (dir. Toshihiro Matsumoto, 2017), she coped by carrying a blue notebook everywhere, writing down what she did, who she spoke to, and where she went — trying to anchor herself in a present that kept dissolving. She said: "I want to leave it in a tangible form, so I'm engrossed in taking notes now" Over time the volume of notebooks became unmanageable; when moving in with relatives, she shredded months of her own notes. CBC followed her for years, and the documentary — whose tagline is "Memory is Life" — shows she eventually stopped taking memos entirely. She also taught herself a driving route to a local supermarket through sheer repetition, an example of procedural memory surviving where declarative memory could not. This paradox — notes as both lifeline and burden, the choice to stop writing rather than drown in paper — directly motivated our design: pneural-context has a consolidation pipeline (to prevent unmanageable volume) and graceful forgetting via Ebbinghaus decay (accepting that not everything needs to be kept — as Mizuta herself demonstrated when she eventually stopped writing).
+
+- **Clive Wearing** — a British musician who lost the ability to form new declarative memories after herpes simplex viral encephalitis in 1985, living in an eternal present with a ~7-30 second memory span. He filled diary after diary with entries like "8:31 AM: Now I am really, completely awake" — then crossed them out moments later, unable to recognize his own handwriting as real. Despite catastrophic amnesia, his procedural memory (conducting, playing piano) and emotional responses remained intact — he greeted his wife Deborah with joy every time he saw her, even moments after she'd left the room. This dissociation between destroyed declarative memory and preserved procedural/emotional memory directly motivated our separation of memory into five types (`red`, `concept`, `procedural`, `temporal`, `relation`) and our decision to give procedural entries higher decay resistance.
+
+- **Hippocampal replay** — the neuroscience of how the brain consolidates experiences during sleep. During slow-wave sleep, hippocampal place cells reactivate in the same sequences as during waking experience (Wilson & McNaughton, 1994), transferring short-term traces to neocortical long-term storage. Our 3-tier consolidation pipeline (`immediate → consolidated → timeless`) directly mirrors this hippocampo-neocortical transfer.
+
+- **Ebbinghaus forgetting curve** — the mathematical model of memory decay where unused memories fade exponentially unless refreshed through recall (Ebbinghaus, 1885/1913). Our decay system applies `strength *= 0.95` per consolidation cycle, and our `boost_entry` operation adds `+0.3` strength on access (capped at 1.0) — a computational implementation of the spaced repetition principle that Cepeda et al. (2006) meta-analytically confirmed produces ~2× better retention than massed practice.
+
+### Scientific References
+
+> *Under construction — citations being compiled.*
+
+1. Ebbinghaus, H. (1913). *Memory: A contribution to experimental psychology* (H. A. Ruger & C. E. Bussenius, Trans.). New York: Teachers College, Columbia University. — The original forgetting curve: memory decays exponentially over time unless reinforced. Our decay model (`strength *= 0.95`) is a discretized approximation of this curve.
+
+2. Murre, J. M. J., & Dros, J. (2015). Replication and analysis of Ebbinghaus' forgetting curve. *PLOS ONE*, 10(7), e0120644. https://doi.org/10.1371/journal.pone.0120644 — Validated Ebbinghaus' parameters with modern methods. Key finding: forgetting curves show a "jump" at 24 hours, suggesting a sleep-consolidation benefit. Supports our design where a consolidation cycle both decays AND consolidates.
+
+3. Buzsáki, G. (1996). The hippocampo-neocortical dialogue. *Cerebral Cortex*, 6(2), 81–92. https://doi.org/10.1093/cercor/6.2.81 — The architectural blueprint for our 3-tier system. Describes two hippocampal modes: "open loop" (awake, information processing) and "closed loop" (sleep, sharp wave-ripple consolidation). Our `immediate` tier = open loop encoding; `run_consolidation()` = closed loop replay; `timeless` = neocortical permanent storage.
+
+4. Diekelmann, S., & Born, J. (2010). The memory function of sleep. *Nature Reviews Neuroscience*, 11(2), 114–126. https://doi.org/10.1038/nrn2762 — Directly informed our consolidation timing and promotion logic. Key findings used: (1) SWS preferentially consolidates declarative memories; (2) sleep soon after learning is more effective (our `immediate` tier captures recent entries); (3) emotional/salient memories get prioritized (our `critical` priority auto-promotes to `timeless`); (4) explicit encoding is required for consolidation (we only consolidate explicitly-added memories).
+
+5. Cepeda, N. J., Pashler, H., Vul, E., Wixted, J. T., & Rohrer, D. (2006). Distributed practice in verbal recall tasks: A review and quantitative synthesis. *Psychological Bulletin*, 132(3), 354–380. https://doi.org/10.1037/0033-2909.132.3.354 — The meta-analytic foundation for our boost/touch mechanism. Across 839 comparisons, spaced practice produces ~2× better retention than massed practice. Validates our `boost_entry` (+0.3 strength on recall/access) and our `archive_threshold = 0.1` (over-spacing reduces benefit, so forgotten entries are archived rather than rescued).
+
+6. Wilson, M. A., & McNaughton, B. L. (1994). Reactivation of hippocampal ensemble memories during sleep. *Science*, 265(5172), 676–679. https://doi.org/10.1126/science.8036517 — First direct evidence that hippocampal cells replay waking experience sequences during sleep. The neurobiological basis for our `run_consolidation()` function: just as hippocampal cells replay experiences during sleep to transfer them to neocortex, our system replays recent entries to extract insights and promote them to consolidated/timeless tiers.
+
+7. Wilson, B. A., Baddeley, A. D., & Kapur, N. (1995). Dense amnesia in a professional musician following herpes simplex virus encephalitis. *Journal of Clinical and Experimental Neuropsychology*, 17(5), 668–681. https://doi.org/10.1080/01688639508405157 — Clive Wearing's case: severe amnesia with preserved procedural and emotional memory. Despite 7-second memory span, Wearing could conduct music and play piano. This dissociation motivated our `memory_type` separation (procedural entries resist decay) and our red ink system (emotional/critical entries never fall below `strength = 0.5`).
+
+---
+
+pneural-context gives LLM agents:
 
 - **Memory entries** with priority levels (critical/important/normal) and typed classification (red/concept/procedural/temporal/relation)
 - **Automatic consolidation** that promotes frequently-accessed memories to higher tiers and archives forgotten ones
@@ -245,12 +283,6 @@ export PNEURAL_MEMORIA_ENABLED=true
 ```
 
 This enriches consolidation and briefing with Memoria's session and topic data. Without Memoria, pneural-context uses its own memory entries directly.
-
-## Inspired By
-
-- **Junko Mizuta's "paper brain" notebook system** — a physical organizational method for researchers to manage papers, notes, and ideas using structured index cards
-- **Clive Wearing's condition** — a musician who lost the ability to form new memories, living in an eternal present, reminding us why persistent context beyond the moment matters
-- **Hippocampal replay** — the neuroscience of how the brain consolidates experiences during sleep, promoting short-term traces into long-term knowledge
 
 ## License
 
