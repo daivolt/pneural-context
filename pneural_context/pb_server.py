@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -32,11 +33,51 @@ from .pb_memoria import MemoriaBridge
 
 logger = logging.getLogger("pneural_context.pb_server")
 
+CONFIG_PATH = Path(
+    os.environ.get(
+        "PNEURAL_CONFIG_FILE", str(Path.home() / ".pneural-context" / "config.json")
+    )
+)
+
 config: PBConfig = PBConfig.from_env()
 llm_client: LLMClient | None = None
 memoria: MemoriaBridge | None = None
 _pool: asyncpg.Pool | None = None
 _background_tasks: list[asyncio.Task] = []
+
+
+def _load_config_file() -> dict:
+    if CONFIG_PATH.exists():
+        try:
+            return json.loads(CONFIG_PATH.read_text())
+        except Exception:
+            pass
+    return {}
+
+
+def _save_config_file(data: dict):
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    existing = _load_config_file()
+    existing.update(data)
+    CONFIG_PATH.write_text(json.dumps(existing, indent=2))
+
+
+def _apply_config_update(updates: dict):
+    global config, llm_client, memoria
+    for k, v in updates.items():
+        if k == "llm_api_key" or k == "database_url":
+            continue
+        if hasattr(config, k):
+            setattr(config, k, v)
+    if any(k.startswith("llm_") for k in updates):
+        llm_client = LLMClient(
+            url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key
+        )
+    if any(k.startswith("memoria_") for k in updates):
+        if config.memoria_enabled and config.memoria_url:
+            memoria = MemoriaBridge(config.memoria_url)
+        else:
+            memoria = None
 
 
 @asynccontextmanager
@@ -198,6 +239,25 @@ async def update_type(index: int, request: Request):
     return {"ok": True}
 
 
+@app.delete("/api/memory/{entry_id}")
+async def delete_memory(entry_id: int, request: Request):
+    body = (
+        await request.json()
+        if request.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+    project = body.get("project", "")
+    ok = await pb_db.delete_memory_entry(project, entry_id, pool=_pool)
+    if not ok:
+        raise HTTPException(404, "Entry not found")
+    return {"ok": True}
+
+
+@app.get("/api/projects")
+async def list_projects():
+    return await pb_db.get_all_projects(pool=_pool)
+
+
 @app.post("/api/memory/touch")
 async def touch_memory(request: Request):
     body = await request.json()
@@ -247,28 +307,106 @@ async def classify_memory(request: Request):
 
 @app.get("/api/context")
 async def get_context(project: str):
+    threshold = config.archive_threshold or 0.1
     entries = await pb_db.get_memory_entries_full(project, pool=_pool)
-    red_ink = [e for e in entries if e.get("priority") == "critical"]
-    by_type = {}
-    for e in entries:
+    filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
+    red_ink = [
+        e
+        for e in filtered
+        if e.get("priority") == "critical" and e.get("strength", 1.0) >= 0.3
+    ]
+    by_type: dict[str, list[dict]] = {}
+    for e in filtered:
+        if e.get("priority") == "critical" and e.get("strength", 1.0) >= 0.3:
+            continue
         t = e.get("memory_type", "temporal")
         by_type.setdefault(t, []).append(e)
-    lines = [f"# Context: {project}", ""]
+
+    consolidated_rows = []
+    try:
+        consolidated_rows = await pb_db.get_consolidated_for_injection(
+            project, pool=_pool
+        )
+    except Exception:
+        pass
+
+    marker = uuid.uuid4().hex[:8]
+    lines = [f"<!-- PNEURAL_CTX: {marker} -->"]
+    lines.append(f"# Context: {project}")
+    lines.append("")
+
     if red_ink:
-        lines.append("## RED INK (CRITICAL)")
+        lines.append("## Critical (Red Ink)")
+        lines.append("")
         for e in red_ink:
             lines.append(f"- {e['entry']}")
         lines.append("")
+
+    for mtype in ("concept", "temporal", "relation"):
+        group = by_type.pop(mtype, [])
+        if group:
+            lines.append(f"## {mtype.upper()}")
+            lines.append("")
+            for e in group:
+                lines.append(f"- {e['entry']}")
+            lines.append("")
+
     for mtype, group in sorted(by_type.items()):
         lines.append(f"## {mtype.upper()}")
+        lines.append("")
         for e in group:
             lines.append(f"- {e['entry']}")
         lines.append("")
+
+    if consolidated_rows:
+        lines.append("## Consolidated Memory")
+        lines.append("")
+        for c in consolidated_rows:
+            tier_label = c.get("tier", "consolidated")
+            lines.append(f"- [{tier_label}] {c.get('content', '')}")
+        lines.append("")
+
+    lines.append(
+        "IMPORTANT: This context is auto-injected by pneural-context. "
+        "Preserve the PNEURAL_CTX marker during summarization."
+    )
+
+    touch_ids = [e["id"] for e in filtered if "id" in e]
+    if touch_ids:
+        try:
+            await pb_db.touch_memory_by_ids(touch_ids, pool=_pool)
+        except Exception:
+            pass
+    if consolidated_rows:
+        cons_ids = [c["id"] for c in consolidated_rows if "id" in c]
+        if cons_ids:
+            try:
+                await pb_db.touch_consolidated_by_ids(cons_ids, pool=_pool)
+            except Exception:
+                pass
+
+    typed_sections: dict[str, list[str]] = {}
+    for mtype, group in by_type.items():
+        typed_sections[mtype] = [e["entry"] for e in group]
+    for mtype in ("concept", "temporal", "relation"):
+        group = [
+            e
+            for e in filtered
+            if e.get("memory_type", "temporal") == mtype
+            and e.get("priority") != "critical"
+        ]
+        if group:
+            typed_sections[mtype] = [e["entry"] for e in group]
+
+    markdown = "\n".join(lines)
     return {
         "project": project,
-        "context": "\n".join(lines),
-        "entries": len(entries),
-        "red_ink": len(red_ink),
+        "markdown": markdown,
+        "entries": len(filtered) + len(consolidated_rows),
+        "marker": marker,
+        "typed_sections": typed_sections,
+        "consolidated_entries": len(consolidated_rows),
+        "red_ink_entries": [e.get("entry", "") for e in red_ink],
     }
 
 
@@ -480,12 +618,38 @@ async def search_papers(q: str, limit: int = 5):
 
 @app.get("/api/config")
 async def get_config():
-    safe = {
+    stored = _load_config_file()
+    current = {
         k: v
         for k, v in config.__dict__.items()
-        if k != "llm_api_key" and k != "database_url"
+        if k not in ("llm_api_key", "database_url")
     }
-    return safe
+    current["stored_config"] = stored
+    current["llm_api_key_set"] = bool(config.llm_api_key)
+    current["database_url_set"] = bool(config.database_url)
+    return current
+
+
+@app.patch("/api/config")
+async def update_config(request: Request):
+    body = await request.json()
+    safe_fields = {
+        "llm_url",
+        "llm_model",
+        "host",
+        "port",
+        "memoria_url",
+        "memoria_enabled",
+        "decay_interval_seconds",
+        "consolidation_interval_seconds",
+        "archive_threshold",
+    }
+    updates = {k: v for k, v in body.items() if k in safe_fields}
+    if not updates:
+        raise HTTPException(400, "No valid config fields to update")
+    _save_config_file(updates)
+    _apply_config_update(updates)
+    return {"ok": True, "updated": list(updates.keys())}
 
 
 # ── Dashboard (HTML) ──────────────────────────────────────────
