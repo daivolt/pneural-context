@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 
 def render_dashboard(project: str | None = None) -> str:
     proj = project or ""
@@ -299,9 +301,9 @@ svg.chart{width:100%;height:80px;margin-top:8px}
 
 <script>
 const BASE='';
-let P='"""
-        + proj
-        + """';
+let P=JSON.parse('"""
+        + json.dumps(proj)
+        + """');
 let refreshTimer=null;
 let currentTab='overview';
 let contextData=null;
@@ -457,7 +459,7 @@ async function addMemory(){
 
 async function deleteEntry(id){
   if(!P)return;
-  const result=await api('/api/memory/'+id,{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({project:P})});
+  const result=await api('/api/memory/'+id+'?project='+encodeURIComponent(P),{method:'DELETE'});
   if(result&&result.ok){showToast('Entry deleted');refreshAll()}else{showToast('Failed to delete','error')}
 }
 

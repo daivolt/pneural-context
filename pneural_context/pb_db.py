@@ -203,11 +203,13 @@ async def replace_memory_entry(
     project: str, old: str, new: str, pool: asyncpg.Pool | None = None
 ) -> bool:
     p = await _get_pool(pool)
-    row = await p.fetchrow(
-        "SELECT id, entry FROM pb_memory WHERE project = $1 AND entry LIKE '%' || $2 || '%' LIMIT 1",
-        project,
-        old,
-    )
+    async with p.acquire() as conn, conn.transaction():
+        escaped_old = old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        row = await conn.fetchrow(
+            "SELECT id, entry FROM pb_memory WHERE project = $1 AND entry ILIKE '%' || $2 || '%' ESCAPE '\\' LIMIT 1",
+            project,
+            escaped_old,
+        )
     if not row:
         return False
     await p.execute(
@@ -258,14 +260,16 @@ async def search_memory(
     pool: asyncpg.Pool | None = None,
 ) -> list[dict]:
     p = await _get_pool(pool)
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     rows = await p.fetch(
         """SELECT id, project, entry, priority, memory_type, strength,
                   similarity(entry, $2) AS rank
            FROM pb_memory
-           WHERE project = $1 AND (entry % $2 OR entry ILIKE '%' || $2 || '%')
-           ORDER BY rank DESC LIMIT $3""",
+           WHERE project = $1 AND (entry % $2 OR entry ILIKE '%' || $3 || '%' ESCAPE '\\')
+           ORDER BY rank DESC LIMIT $4""",
         project,
         query,
+        escaped,
         limit,
     )
     return [dict(r) for r in rows]
@@ -323,21 +327,23 @@ async def search_procedures(
 ) -> list[dict]:
     p = await _get_pool(pool)
     threshold = similarity_threshold if similarity_threshold is not None else 0.1
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     async with p.acquire() as conn:
         async with conn.transaction():
-            await conn.execute(f"SET LOCAL pg_trgm.similarity_threshold = {threshold}")
+            await conn.execute("SET LOCAL pg_trgm.similarity_threshold = $1", threshold)
             rows = await conn.fetch(
                 """SELECT id, project, task_pattern, task_type, steps, success_count,
                           fail_count, reinforcement_score, proven_by, created_at, retired,
                           similarity(task_pattern, $2) as sim
                    FROM pb_procedural_memory
                    WHERE project = $1 AND retired = false
-                         AND (task_pattern % $2 OR task_pattern ILIKE '%' || $2 || '%')
+                         AND (task_pattern % $2 OR task_pattern ILIKE '%' || $4 || '%' ESCAPE '\\')
                    ORDER BY similarity(task_pattern, $2) DESC
                    LIMIT $3""",
                 project,
                 query,
                 limit,
+                escaped,
             )
             return [dict(r) for r in rows]
 
@@ -757,14 +763,15 @@ async def search_archived(
 ) -> list[dict]:
     p = await _get_pool(pool)
     if query:
+        escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         rows = await p.fetch(
             """SELECT id, original_id, project, entry, priority, memory_type,
                       strength, archived_at
                FROM pb_memory_archive
-               WHERE project = $1 AND (entry ILIKE $2 OR entry % $3)
+               WHERE project = $1 AND (entry ILIKE '%' || $2 || '%' ESCAPE '\\' OR entry % $3)
                ORDER BY archived_at DESC LIMIT $4""",
             project,
-            f"%{query}%",
+            escaped,
             query,
             limit,
         )
@@ -893,13 +900,16 @@ async def search_papers(
     q: str, limit: int = 5, pool: asyncpg.Pool | None = None
 ) -> list[dict]:
     p = await _get_pool(pool)
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     rows = await p.fetch(
         """SELECT id, filename, folder, title,
                   LEFT(text, 500) as snippet
            FROM pb_papers
-           WHERE title ILIKE $1 OR text ILIKE $1 OR enriched_text ILIKE $1
+           WHERE title ILIKE '%' || $1 || '%' ESCAPE '\\'
+              OR text ILIKE '%' || $1 || '%' ESCAPE '\\'
+              OR enriched_text ILIKE '%' || $1 || '%' ESCAPE '\\'
            ORDER BY id DESC LIMIT $2""",
-        f"%{q}%",
+        escaped,
         limit,
     )
     return [dict(r) for r in rows]

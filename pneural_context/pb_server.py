@@ -240,14 +240,7 @@ async def update_type(index: int, request: Request):
 
 
 @app.delete("/api/memory/{entry_id}")
-async def delete_memory(entry_id: int, request: Request, project: str = ""):
-    if not project:
-        body = (
-            await request.json()
-            if request.headers.get("content-type", "").startswith("application/json")
-            else {}
-        )
-        project = body.get("project", "")
+async def delete_memory(entry_id: int, project: str = Query("")):
     ok = await pb_db.delete_memory_entry(project, entry_id, pool=_pool)
     if not ok:
         raise HTTPException(404, "Entry not found")
@@ -345,7 +338,7 @@ async def get_context(project: str):
             lines.append(f"- {e['entry']}")
         lines.append("")
 
-    for mtype in ("concept", "temporal", "relation"):
+    for mtype in ("concept", "procedural", "temporal", "relation"):
         group = by_type.pop(mtype, [])
         if group:
             lines.append(f"## {mtype.upper()}")
@@ -389,9 +382,7 @@ async def get_context(project: str):
                 pass
 
     typed_sections: dict[str, list[str]] = {}
-    for mtype, group in by_type.items():
-        typed_sections[mtype] = [e["entry"] for e in group]
-    for mtype in ("concept", "temporal", "relation"):
+    for mtype in ("concept", "procedural", "temporal", "relation"):
         group = [
             e
             for e in filtered
@@ -399,6 +390,9 @@ async def get_context(project: str):
             and e.get("priority") != "critical"
         ]
         if group:
+            typed_sections[mtype] = [e["entry"] for e in group]
+    for mtype, group in by_type.items():
+        if mtype not in typed_sections and group:
             typed_sections[mtype] = [e["entry"] for e in group]
 
     markdown = "\n".join(lines)

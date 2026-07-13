@@ -67,18 +67,6 @@ async def run_consolidation(
             content = " | ".join(e["entry"][:200] for e in entries[:10])
         await pb_db.add_consolidated(project, "immediate", content, pool=pool)
         result["immediate_created"] = 1
-    else:
-        if critical:
-            content = " | ".join(e["entry"][:200] for e in critical[:10])
-        elif important:
-            content = " | ".join(e["entry"][:200] for e in important[:10])
-        else:
-            content = " | ".join(e["entry"][:200] for e in entries[:10])
-        existing_imm = await pb_db.get_consolidated_by_tier(
-            project, "immediate", pool=pool
-        )
-        if existing_imm:
-            await pb_db.add_consolidated(project, "immediate", content, pool=pool)
 
     groups_to_consolidate = []
     if len(important) >= 3:

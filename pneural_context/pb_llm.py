@@ -63,12 +63,16 @@ class LLMClient:
             "messages": messages,
             "temperature": temperature,
         }
-        async with session.post(
-            f"{self.url}/chat/completions", json=payload, headers=headers
-        ) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-            return data["choices"][0]["message"]["content"].strip()
+        try:
+            async with session.post(
+                f"{self.url}/chat/completions", json=payload, headers=headers
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.json()
+                return data["choices"][0]["message"]["content"].strip()
+        except Exception:
+            await self.close()
+            raise
 
     async def classify(self, text: str) -> str:
         prompt = CLASSIFY_PROMPT.format(text=text)

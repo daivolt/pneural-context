@@ -27,13 +27,20 @@ def cli():
 @click.option("--host", default=None, help="Host to bind")
 @click.option("--port", default=None, type=int, help="Port to bind")
 def serve(host, port):
-    from .pb_server import main, config
+    import os
+
+    from .pb_server import create_app
 
     if host:
-        config.host = host
+        os.environ["PNEURAL_HOST"] = host
     if port:
-        config.port = port
-    main()
+        os.environ["PNEURAL_PORT"] = str(port)
+
+    cfg = PBConfig.from_env()
+    app = create_app(cfg)
+    import uvicorn
+
+    uvicorn.run(app, host=cfg.host, port=cfg.port)
 
 
 @cli.group()
