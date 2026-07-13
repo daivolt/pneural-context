@@ -240,13 +240,14 @@ async def update_type(index: int, request: Request):
 
 
 @app.delete("/api/memory/{entry_id}")
-async def delete_memory(entry_id: int, request: Request):
-    body = (
-        await request.json()
-        if request.headers.get("content-type", "").startswith("application/json")
-        else {}
-    )
-    project = body.get("project", "")
+async def delete_memory(entry_id: int, request: Request, project: str = ""):
+    if not project:
+        body = (
+            await request.json()
+            if request.headers.get("content-type", "").startswith("application/json")
+            else {}
+        )
+        project = body.get("project", "")
     ok = await pb_db.delete_memory_entry(project, entry_id, pool=_pool)
     if not ok:
         raise HTTPException(404, "Entry not found")
@@ -277,11 +278,13 @@ async def touch_memory(request: Request):
 async def boost_memory(request: Request):
     body = await request.json()
     project = body.get("project", "")
-    index = body.get("index")
-    if index is None:
+    idx = body.get("index")
+    if idx is None:
         raise HTTPException(400, "index required")
-    ok = await pb_db.touch_memory_access(project, index, pool=_pool)
-    return {"ok": ok}
+    result = await pb_db.boost_memory_entry(project, idx, pool=_pool)
+    if result is None:
+        raise HTTPException(404, "Entry not found")
+    return result
 
 
 @app.post("/api/memory/replace")

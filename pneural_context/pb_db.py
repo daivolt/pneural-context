@@ -291,7 +291,7 @@ async def add_procedure(
         project,
         task_pattern,
         task_type,
-        steps,
+        json.dumps(steps),
         proven,
     )
     return row["id"]
@@ -323,22 +323,23 @@ async def search_procedures(
 ) -> list[dict]:
     p = await _get_pool(pool)
     threshold = similarity_threshold if similarity_threshold is not None else 0.1
-    async with p.transaction():
-        await p.execute(f"SET LOCAL pg_trgm.similarity_threshold = {threshold}")
-        rows = await p.fetch(
-            """SELECT id, project, task_pattern, task_type, steps, success_count,
-                      fail_count, reinforcement_score, proven_by, created_at, retired,
-                      similarity(task_pattern, $2) as sim
-               FROM pb_procedural_memory
-               WHERE project = $1 AND retired = false
-                     AND (task_pattern % $2 OR task_pattern ILIKE '%' || $2 || '%')
-               ORDER BY similarity(task_pattern, $2) DESC
-               LIMIT $3""",
-            project,
-            query,
-            limit,
-        )
-        return [dict(r) for r in rows]
+    async with p.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(f"SET LOCAL pg_trgm.similarity_threshold = {threshold}")
+            rows = await conn.fetch(
+                """SELECT id, project, task_pattern, task_type, steps, success_count,
+                          fail_count, reinforcement_score, proven_by, created_at, retired,
+                          similarity(task_pattern, $2) as sim
+                   FROM pb_procedural_memory
+                   WHERE project = $1 AND retired = false
+                         AND (task_pattern % $2 OR task_pattern ILIKE '%' || $2 || '%')
+                   ORDER BY similarity(task_pattern, $2) DESC
+                   LIMIT $3""",
+                project,
+                query,
+                limit,
+            )
+            return [dict(r) for r in rows]
 
 
 async def update_procedure_outcome(
@@ -348,72 +349,73 @@ async def update_procedure_outcome(
     pool: asyncpg.Pool | None = None,
 ) -> dict | None:
     p = await _get_pool(pool)
-    async with p.transaction():
-        row = await p.fetchrow(
-            "SELECT success_count, fail_count FROM pb_procedural_memory WHERE id = $1",
-            proc_id,
-        )
-        if not row:
-            return None
-        cur_succ = row["success_count"]
-        cur_fail = row["fail_count"]
-        if success:
-            new_succ = cur_succ + 1
-            new_fail = cur_fail
-            accuracy = (
-                new_succ / (new_succ + new_fail) if new_succ + new_fail > 0 else 0.5
+    async with p.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                "SELECT success_count, fail_count FROM pb_procedural_memory WHERE id = $1",
+                proc_id,
             )
-            new_score = accuracy * math.log(new_succ + 1)
-            new_score = round(max(0.0, min(1.0, new_score)), 6)
-            if proven_by:
-                row2 = await p.fetchrow(
-                    """UPDATE pb_procedural_memory
-                       SET success_count = $1, fail_count = $2,
-                           reinforcement_score = $3, last_success_at = extract(epoch from now()),
-                           proven_by = array_append(proven_by, $4)
-                       WHERE id = $5 RETURNING *""",
-                    new_succ,
-                    new_fail,
-                    new_score,
-                    proven_by,
-                    proc_id,
+            if not row:
+                return None
+            cur_succ = row["success_count"]
+            cur_fail = row["fail_count"]
+            if success:
+                new_succ = cur_succ + 1
+                new_fail = cur_fail
+                accuracy = (
+                    new_succ / (new_succ + new_fail) if new_succ + new_fail > 0 else 0.5
                 )
+                new_score = accuracy * math.log(new_succ + 1)
+                new_score = round(max(0.0, min(1.0, new_score)), 6)
+                if proven_by:
+                    row2 = await conn.fetchrow(
+                        """UPDATE pb_procedural_memory
+                           SET success_count = $1, fail_count = $2,
+                               reinforcement_score = $3, last_success_at = extract(epoch from now()),
+                               proven_by = array_append(proven_by, $4)
+                           WHERE id = $5 RETURNING *""",
+                        new_succ,
+                        new_fail,
+                        new_score,
+                        proven_by,
+                        proc_id,
+                    )
+                else:
+                    row2 = await conn.fetchrow(
+                        """UPDATE pb_procedural_memory
+                           SET success_count = $1, fail_count = $2,
+                               reinforcement_score = $3, last_success_at = extract(epoch from now())
+                           WHERE id = $4 RETURNING *""",
+                        new_succ,
+                        new_fail,
+                        new_score,
+                        proc_id,
+                    )
             else:
-                row2 = await p.fetchrow(
+                new_succ = cur_succ
+                new_fail = cur_fail + 1
+                accuracy = new_succ / (new_succ + new_fail) if new_succ > 0 else 0.0
+                new_score = accuracy * math.log(new_succ + 1)
+                new_score = round(max(0.0, min(1.0, new_score)), 6)
+                row2 = await conn.fetchrow(
                     """UPDATE pb_procedural_memory
-                       SET success_count = $1, fail_count = $2,
-                           reinforcement_score = $3, last_success_at = extract(epoch from now())
+                       SET success_count = $1, fail_count = $2, reinforcement_score = $3
                        WHERE id = $4 RETURNING *""",
                     new_succ,
                     new_fail,
                     new_score,
                     proc_id,
                 )
-        else:
-            new_succ = cur_succ
-            new_fail = cur_fail + 1
-            accuracy = new_succ / (new_succ + new_fail) if new_succ > 0 else 0.0
-            new_score = accuracy * math.log(new_succ + 1)
-            new_score = round(max(0.0, min(1.0, new_score)), 6)
-            row2 = await p.fetchrow(
-                """UPDATE pb_procedural_memory
-                   SET success_count = $1, fail_count = $2, reinforcement_score = $3
-                   WHERE id = $4 RETURNING *""",
-                new_succ,
-                new_fail,
-                new_score,
-                proc_id,
-            )
-        if (
-            row2
-            and row2["fail_count"] > row2["success_count"] * 2
-            and row2["fail_count"] > 5
-        ):
-            await p.execute(
-                "UPDATE pb_procedural_memory SET retired = TRUE WHERE id = $1",
-                proc_id,
-            )
-        return dict(row2) if row2 else None
+            if (
+                row2
+                and row2["fail_count"] > row2["success_count"] * 2
+                and row2["fail_count"] > 5
+            ):
+                await conn.execute(
+                    "UPDATE pb_procedural_memory SET retired = TRUE WHERE id = $1",
+                    proc_id,
+                )
+            return dict(row2) if row2 else None
 
 
 async def retire_procedure(proc_id: int, pool: asyncpg.Pool | None = None) -> bool:
@@ -640,65 +642,68 @@ async def archive_decay(
     threshold: float = 0.1, pool: asyncpg.Pool | None = None
 ) -> dict:
     p = await _get_pool(pool)
-    async with p.transaction():
-        rows = await p.fetch(
-            """SELECT id, project, entry, priority, memory_type, strength, created_at
-               FROM pb_memory
-               WHERE strength < $1 AND priority != 'critical'""",
-            threshold,
-        )
-        for row in rows:
-            await p.execute(
-                """INSERT INTO pb_memory_archive
-                   (original_id, project, entry, priority, memory_type, strength, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                row["id"],
-                row["project"],
-                row["entry"],
-                row["priority"],
-                row["memory_type"],
-                row["strength"],
-                row["created_at"],
+    async with p.acquire() as conn:
+        async with conn.transaction():
+            rows = await conn.fetch(
+                """SELECT id, project, entry, priority, memory_type, strength, created_at
+                   FROM pb_memory
+                   WHERE strength < $1 AND priority != 'critical'""",
+                threshold,
             )
-        if rows:
-            ids = [row["id"] for row in rows]
-            await p.execute(
-                "DELETE FROM pb_memory WHERE id = ANY($1::bigint[]) AND priority != 'critical'",
-                ids,
+            for row in rows:
+                await conn.execute(
+                    """INSERT INTO pb_memory_archive
+                       (original_id, project, entry, priority, memory_type, strength, created_at)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    row["id"],
+                    row["project"],
+                    row["entry"],
+                    row["priority"],
+                    row["memory_type"],
+                    row["strength"],
+                    row["created_at"],
+                )
+            if rows:
+                ids = [row["id"] for row in rows]
+                await conn.execute(
+                    "DELETE FROM pb_memory WHERE id = ANY($1::bigint[]) AND priority != 'critical'",
+                    ids,
+                )
+            c_rows = await conn.fetch(
+                """SELECT id, project, content, priority, memory_type, strength, created_at
+                   FROM pb_consolidated_memory
+                   WHERE strength < $1 AND priority != 'critical'""",
+                threshold,
             )
-        c_rows = await p.fetch(
-            """SELECT id, project, content, priority, memory_type, strength, created_at
-               FROM pb_consolidated_memory
-               WHERE strength < $1 AND priority != 'critical'""",
-            threshold,
-        )
-        for row in c_rows:
-            await p.execute(
-                """INSERT INTO pb_memory_archive
-                   (original_id, project, entry, priority, memory_type, strength, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                row["id"],
-                row["project"],
-                row["content"],
-                row["priority"],
-                row["memory_type"],
-                row["strength"],
-                row["created_at"],
+            for row in c_rows:
+                await conn.execute(
+                    """INSERT INTO pb_memory_archive
+                       (original_id, project, entry, priority, memory_type, strength, created_at)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    row["id"],
+                    row["project"],
+                    row["content"],
+                    row["priority"],
+                    row["memory_type"],
+                    row["strength"],
+                    row["created_at"],
+                )
+            if c_rows:
+                c_ids = [row["id"] for row in c_rows]
+                await conn.execute(
+                    "DELETE FROM pb_consolidated_memory WHERE id = ANY($1::int[]) AND priority != 'critical'",
+                    c_ids,
+                )
+            remaining = await conn.fetchval("SELECT COUNT(*) FROM pb_memory")
+            c_remaining = await conn.fetchval(
+                "SELECT COUNT(*) FROM pb_consolidated_memory"
             )
-        if c_rows:
-            c_ids = [row["id"] for row in c_rows]
-            await p.execute(
-                "DELETE FROM pb_consolidated_memory WHERE id = ANY($1::int[]) AND priority != 'critical'",
-                c_ids,
-            )
-        remaining = await p.fetchval("SELECT COUNT(*) FROM pb_memory")
-        c_remaining = await p.fetchval("SELECT COUNT(*) FROM pb_consolidated_memory")
-        return {
-            "archived": len(rows),
-            "consolidated_archived": len(c_rows),
-            "remaining": remaining,
-            "consolidated_remaining": c_remaining,
-        }
+            return {
+                "archived": len(rows),
+                "consolidated_archived": len(c_rows),
+                "remaining": remaining,
+                "consolidated_remaining": c_remaining,
+            }
 
 
 async def get_decay_status(project: str, pool: asyncpg.Pool | None = None) -> dict:
@@ -729,20 +734,21 @@ async def archive_memory_entry(entry_id: int, pool: asyncpg.Pool | None = None) 
     )
     if not row:
         return False
-    async with p.transaction():
-        await p.execute(
-            """INSERT INTO pb_memory_archive
-               (original_id, project, entry, priority, memory_type, strength, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-            row["id"],
-            row["project"],
-            row["entry"],
-            row["priority"],
-            row["memory_type"],
-            row["strength"],
-            row["created_at"],
-        )
-        await p.execute("DELETE FROM pb_memory WHERE id = $1", entry_id)
+    async with p.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute(
+                """INSERT INTO pb_memory_archive
+                   (original_id, project, entry, priority, memory_type, strength, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                row["id"],
+                row["project"],
+                row["entry"],
+                row["priority"],
+                row["memory_type"],
+                row["strength"],
+                row["created_at"],
+            )
+            await conn.execute("DELETE FROM pb_memory WHERE id = $1", entry_id)
     return True
 
 
@@ -785,18 +791,21 @@ async def restore_archived(
     )
     if not row:
         return None
-    async with p.transaction():
-        new_row = await p.fetchrow(
-            """INSERT INTO pb_memory (project, entry, priority, memory_type, strength, last_accessed)
-               VALUES ($1, $2, $3, $4, $5, extract(epoch from now()))
-               RETURNING id""",
-            row["project"],
-            row["entry"],
-            row["priority"],
-            row["memory_type"],
-            min(row["strength"] + 0.2, 1.0),
-        )
-        await p.execute("DELETE FROM pb_memory_archive WHERE id = $1", archive_id)
+    async with p.acquire() as conn:
+        async with conn.transaction():
+            new_row = await conn.fetchrow(
+                """INSERT INTO pb_memory (project, entry, priority, memory_type, strength, last_accessed)
+                   VALUES ($1, $2, $3, $4, $5, extract(epoch from now()))
+                   RETURNING id""",
+                row["project"],
+                row["entry"],
+                row["priority"],
+                row["memory_type"],
+                min(row["strength"] + 0.2, 1.0),
+            )
+            await conn.execute(
+                "DELETE FROM pb_memory_archive WHERE id = $1", archive_id
+            )
     return {
         "id": new_row["id"],
         "project": row["project"],
