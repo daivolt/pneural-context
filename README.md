@@ -64,13 +64,15 @@ pneural-context gives LLM agents:
 ## Install
 
 ```bash
-pip install pneural-context
+git clone https://github.com/daivolt/pneural-context.git
+cd pneural-context
+pip install -e .
 ```
 
 For optional Memoria integration:
 
 ```bash
-pip install pneural-context[memoria]
+pip install -e ".[memoria]"
 ```
 
 ## Quick Start
