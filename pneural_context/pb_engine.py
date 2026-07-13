@@ -10,6 +10,17 @@ from .pb_llm import LLMClient
 logger = logging.getLogger("pneural_context.pb_engine")
 
 
+def _to_epoch(val: Any) -> float:
+    from datetime import datetime
+
+    if isinstance(val, datetime):
+        return val.timestamp()
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 async def auto_classify(
     project: str, llm: LLMClient | None = None, pool=None
 ) -> dict[str, Any]:
@@ -138,7 +149,7 @@ async def run_consolidation(
         for e in entries
         if e.get("memory_type") == "temporal"
         and e.get("priority") == "normal"
-        and e.get("created_at", 0) < thirty_days_ago
+        and _to_epoch(e.get("created_at", 0)) < thirty_days_ago
     ]
     for entry in old_temporal[:50]:
         ok = await pb_db.archive_memory_entry(entry["id"], pool=pool)
@@ -205,7 +216,7 @@ async def generate_briefing(
         lines.append("")
 
     if task_description:
-        lines.append(f"## Task Context")
+        lines.append("## Task Context")
         lines.append(f"- {task_description}")
         lines.append("")
 

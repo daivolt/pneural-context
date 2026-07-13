@@ -302,7 +302,7 @@ svg.chart{width:100%;height:80px;margin-top:8px}
 <script>
 const BASE='';
 let P=JSON.parse('"""
-        + json.dumps(proj)
+        + json.dumps(proj).replace("<", "\\x3c").replace(">", "\\x3e")
         + """');
 let refreshTimer=null;
 let currentTab='overview';
@@ -365,7 +365,7 @@ function renderProcs(data){
   el.textContent=procs.length;
   const avgScore=procs.length?(procs.reduce((s,p)=>(s+(p.reinforcement_score||0)),0)/procs.length).toFixed(2):'0';
   sub.textContent='avg score: '+avgScore;
-  list.innerHTML=procs.slice(0,8).map(p=>'<li><span class="badge badge-'+(p.task_type||'task')+'">'+(p.task_type||'task')+'</span> '+esc(p.task_pattern||'').slice(0,70)+' <small style="color:var(--text3)">score:'+((p.reinforcement_score||0)*100).toFixed(0)+'%</small></li>').join('');
+  list.innerHTML=procs.slice(0,8).map(p=>'<li><span class="badge badge-'+esc(p.task_type||'task')+'">'+esc(p.task_type||'task')+'</span> '+esc(p.task_pattern||'').slice(0,70)+' <small style="color:var(--text3)">score:'+((p.reinforcement_score||0)*100).toFixed(0)+'%</small></li>').join('');
 }
 
 function renderConsol(data){

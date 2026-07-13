@@ -203,21 +203,24 @@ async def replace_memory_entry(
     project: str, old: str, new: str, pool: asyncpg.Pool | None = None
 ) -> bool:
     p = await _get_pool(pool)
-    async with p.acquire() as conn, conn.transaction():
-        escaped_old = old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        row = await conn.fetchrow(
-            "SELECT id, entry FROM pb_memory WHERE project = $1 AND entry ILIKE '%' || $2 || '%' ESCAPE '\\' LIMIT 1",
-            project,
-            escaped_old,
-        )
-    if not row:
-        return False
-    await p.execute(
-        "UPDATE pb_memory SET entry = $1 WHERE id = $2",
-        new,
-        row["id"],
-    )
-    return True
+    async with p.acquire() as conn:
+        async with conn.transaction():
+            escaped_old = (
+                old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            row = await conn.fetchrow(
+                "SELECT id, entry FROM pb_memory WHERE project = $1 AND entry ILIKE '%' || $2 || '%' ESCAPE '\\' LIMIT 1",
+                project,
+                escaped_old,
+            )
+            if not row:
+                return False
+            await conn.execute(
+                "UPDATE pb_memory SET entry = $1 WHERE id = $2",
+                new,
+                row["id"],
+            )
+            return True
 
 
 async def delete_memory_entry(

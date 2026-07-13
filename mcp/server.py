@@ -244,7 +244,7 @@ async def list_tools() -> list[Tool]:
         tools.append(
             Tool(
                 name="pb_recall",
-                description="Search across sessions, chats, and memory with LLM-driven query enrichment.",
+                description="Search across sessions, chats, and memory.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -262,11 +262,6 @@ async def list_tools() -> list[Tool]:
                             "type": "string",
                             "enum": ["sessions", "chats"],
                             "description": "Filter to specific source (optional)",
-                        },
-                        "enrich": {
-                            "type": "boolean",
-                            "default": True,
-                            "description": "Enable LLM query enrichment",
                         },
                         "boost": {
                             "type": "boolean",
@@ -758,7 +753,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         if name == "pb_recall":
             params = {"q": arguments["q"]}
-            for k in ("project", "limit", "source", "enrich", "boost"):
+            for k in ("project", "limit", "source", "boost"):
                 if k in arguments:
                     params[k] = arguments[k]
             result = await api_get("/api/recall", params)
@@ -841,11 +836,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=fmt(result))]
 
         if name == "pb_procedure_outcome":
+            outcome = arguments["outcome"]
+            success = outcome in ("success", True, "true", 1)
             result = await api_post(
                 f"/api/procedures/{arguments['proc_id']}/outcome",
                 {
-                    "project": arguments["project"],
-                    "outcome": arguments["outcome"],
+                    "success": success,
+                    "proven_by": arguments.get("proven_by", ""),
                 },
             )
             return [TextContent(type="text", text=fmt(result))]

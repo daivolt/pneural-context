@@ -68,7 +68,7 @@ Get assembled injection context — full markdown with typed sections and red in
 HELP_RECALL = """\
 # Recall Module
 
-Search across sessions, chats, and memory with optional LLM query enrichment.
+Search across sessions, chats, and memory.
 
 ## Tools
 
@@ -78,7 +78,6 @@ Search across all stored content with semantic matching.
 - **project**: Project name (optional)
 - **limit**: Max results to return (default: 5)
 - **source**: Filter to specific source — "sessions" or "chats" (optional)
-- **enrich**: Enable LLM query enrichment (default: true)
 - **boost**: Boost matching memory entries via spaced repetition (default: true)
 """
 

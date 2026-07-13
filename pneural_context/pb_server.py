@@ -124,6 +124,8 @@ async def lifespan(app: FastAPI):
 
     for task in _background_tasks:
         task.cancel()
+    if llm_client:
+        await llm_client.close()
     if _pool:
         await _pool.close()
     if memoria:
@@ -194,7 +196,7 @@ async def add_memory(request: Request):
 
 
 @app.get("/api/memory")
-async def get_memory(project: str, pool=None):
+async def get_memory(project: str):
     entries = await pb_db.get_memory_entries(project, pool=_pool)
     return entries
 
@@ -303,7 +305,9 @@ async def classify_memory(request: Request):
 
 @app.get("/api/context")
 async def get_context(project: str):
-    threshold = config.archive_threshold or 0.1
+    threshold = (
+        config.archive_threshold if config.archive_threshold is not None else 0.1
+    )
     entries = await pb_db.get_memory_entries_full(project, pool=_pool)
     filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
     red_ink = [
@@ -416,7 +420,6 @@ async def recall(
     project: str | None = None,
     limit: int = 5,
     source: str | None = None,
-    enrich: bool = True,
     boost: bool = True,
 ):
     results = []
@@ -438,7 +441,7 @@ async def recall(
         results = results[:limit]
     if memoria and (not source or source == "sessions"):
         try:
-            mem_results = await memoria.recall(q, project=project, limit=limit)
+            mem_results = await memoria.recall(q, project=project or "", limit=limit)
             results.extend(mem_results)
         except Exception:
             pass
@@ -616,32 +619,52 @@ async def search_papers(q: str, limit: int = 5):
 @app.get("/api/config")
 async def get_config():
     stored = _load_config_file()
+    safe_stored = {
+        k: v for k, v in stored.items() if k not in ("llm_api_key", "database_url")
+    }
     current = {
         k: v
         for k, v in config.__dict__.items()
         if k not in ("llm_api_key", "database_url")
     }
-    current["stored_config"] = stored
+    current["stored_config"] = safe_stored
     current["llm_api_key_set"] = bool(config.llm_api_key)
     current["database_url_set"] = bool(config.database_url)
     return current
 
 
+_CONFIG_TYPES = {
+    "llm_url": str,
+    "llm_model": str,
+    "host": str,
+    "port": int,
+    "memoria_url": str,
+    "memoria_enabled": bool,
+    "decay_interval_seconds": (int, float),
+    "consolidation_interval_seconds": (int, float),
+    "archive_threshold": (int, float),
+}
+
+
 @app.patch("/api/config")
 async def update_config(request: Request):
     body = await request.json()
-    safe_fields = {
-        "llm_url",
-        "llm_model",
-        "host",
-        "port",
-        "memoria_url",
-        "memoria_enabled",
-        "decay_interval_seconds",
-        "consolidation_interval_seconds",
-        "archive_threshold",
-    }
-    updates = {k: v for k, v in body.items() if k in safe_fields}
+    updates = {}
+    for k, v in body.items():
+        if k not in _CONFIG_TYPES:
+            continue
+        expected = _CONFIG_TYPES[k]
+        if not isinstance(v, expected):
+            type_names = expected if isinstance(expected, tuple) else (expected,)
+            names = "/".join(t.__name__ for t in type_names)
+            raise HTTPException(
+                400, f"Field '{k}' must be {names}, got {type(v).__name__}"
+            )
+        updates[k] = (
+            float(v)
+            if isinstance(expected, tuple) and int in expected and isinstance(v, int)
+            else v
+        )
     if not updates:
         raise HTTPException(400, "No valid config fields to update")
     _save_config_file(updates)

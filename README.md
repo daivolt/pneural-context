@@ -172,7 +172,7 @@ All endpoints use the `/api/` prefix.
 | `POST` | `/api/memory/touch` | Refresh access timestamp |
 | `POST` | `/api/memory/boost` | Boost entry strength (+0.3) |
 | `GET` | `/api/context` | Get assembled injection context |
-| `GET` | `/api/recall` | Search memories with LLM enrichment |
+| `GET` | `/api/recall` | Search memories and sessions |
 | `GET` | `/api/briefing` | Generate task-specific briefing |
 | `GET` | `/api/anchors` | Get environmental anchors |
 | `POST` | `/api/consolidation` | Trigger consolidation |
