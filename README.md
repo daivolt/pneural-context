@@ -66,6 +66,8 @@ pneural-context gives LLM agents:
 ```bash
 git clone https://github.com/daivolt/pneural-context.git
 cd pneural-context
+python -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
