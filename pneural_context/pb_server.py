@@ -602,10 +602,14 @@ async def record_session(request: Request):
     session_id = body.get("session_id", "")
     title = body.get("title", "")
     messages = body.get("messages", [])
+    memory_type = body.get("memory_type", "temporal")
     if not project:
         raise HTTPException(400, "project required")
-    if not messages:
-        raise HTTPException(400, "messages required")
+    if not isinstance(messages, list) or not messages:
+        raise HTTPException(400, "messages must be a non-empty list")
+    valid_types = {"red", "concept", "procedural", "temporal", "relation"}
+    if memory_type not in valid_types:
+        memory_type = "temporal"
     summary = ""
     if llm_client:
         try:
@@ -615,7 +619,7 @@ async def record_session(request: Request):
     if not summary:
         summary = title or f"Session {session_id[:8] if session_id else 'unknown'}"
     entry_id = await pb_db.add_memory_entry(
-        project, summary, "normal", "temporal", pool=_pool
+        project, summary, "normal", memory_type, pool=_pool
     )
     return {
         "id": entry_id,

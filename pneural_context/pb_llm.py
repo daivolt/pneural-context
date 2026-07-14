@@ -137,6 +137,8 @@ class LLMClient:
             if not content:
                 continue
             parts.append(f"[{role}] {content[:500]}")
+        if not parts:
+            return title or "empty session"
         conversation = "\n".join(parts)
 
         prompt = (

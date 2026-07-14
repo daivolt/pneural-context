@@ -1,5 +1,6 @@
 const PNEURAL_URL = process.env.PNEURAL_CONTEXT_URL || "http://localhost:8778";
 const TIMEOUT_MS = 5000;
+const RECORD_TIMEOUT_MS = 30000;
 
 const PB_INJECT_ON_START = process.env.PB_INJECT_ON_START !== "false";
 const PB_INJECT_ON_COMPACT = process.env.PB_INJECT_ON_COMPACT !== "false";
@@ -24,7 +25,7 @@ const resolveProject = (ctx) => {
       if (cfg.project) return cfg.project;
     }
   } catch (_) {}
-  return dir.split("/").filter(Boolean).pop() || "unknown";
+  return path.basename(dir) || "unknown";
 };
 
 const getJSON = async (urlPath) => {
@@ -39,12 +40,12 @@ const getJSON = async (urlPath) => {
   }
 };
 
-const postJSON = async (path, body) => {
+const postJSON = async (path, body, timeout = TIMEOUT_MS * 2) => {
   try {
     const resp = await fetch(`${PNEURAL_URL}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: AbortSignal.timeout(TIMEOUT_MS * 2),
+      signal: AbortSignal.timeout(timeout),
       body: JSON.stringify(body),
     });
     if (!resp.ok) {
@@ -144,7 +145,8 @@ export default async (ctx) => {
             session_id: sessionId,
             title,
             messages,
-          });
+            memory_type: PB_SESSION_RECORD_TYPE,
+          }, RECORD_TIMEOUT_MS);
         } catch (_) {}
 
         contextCache = null;

@@ -329,6 +329,7 @@ echo '{"project": "my-project-name"}' > .pneural-context.json
 | `PB_INJECT_ON_START` | `true` | Inject context on session start |
 | `PB_INJECT_ON_COMPACT` | `true` | Preserve context through compaction |
 | `PB_RECORD_SESSIONS` | `false` | Auto-record session summaries as memory |
+| `PB_SESSION_RECORD_TYPE` | `temporal` | Memory type for recorded sessions (red, concept, procedural, temporal, relation) |
 
 ### How it works
 
