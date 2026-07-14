@@ -288,6 +288,56 @@ export PNEURAL_MEMORIA_ENABLED=true
 
 This enriches consolidation and briefing with Memoria's session and topic data. Without Memoria, pneural-context uses its own memory entries directly.
 
+## opencode Plugin
+
+A plugin for [opencode](https://opencode.ai) that auto-injects pneural-context memory into every session and optionally records session summaries as memory entries.
+
+### Features
+
+- **Context injection** — fetches project memory on session start and injects it into the system prompt
+- **Compaction preservation** — ensures pneural-context survives opencode's session compaction
+- **Session recording** — on `session.idle`, summarizes the session in caveman style and stores it as a memory entry (opt-in)
+
+### Setup
+
+1. Copy the plugin file to your opencode plugins directory:
+
+```bash
+cp plugins/opencode/pneural-context.mjs ~/.config/opencode/plugins/
+# or for project-level:
+cp plugins/opencode/pneural-context.mjs .opencode/plugins/
+```
+
+2. Create a project mapping file in your project root:
+
+```bash
+echo '{"project": "my-project-name"}' > .pneural-context.json
+```
+
+3. Add `.pneural-context/` to your `.gitignore` (it stores cached context):
+
+```
+.pneural-context/
+```
+
+4. Set environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PNEURAL_CONTEXT_URL` | `http://localhost:8778` | pneural-context server URL |
+| `PNEURAL_PROJECT` | *(from .pneural-context.json)* | Override project name |
+| `PB_INJECT_ON_START` | `true` | Inject context on session start |
+| `PB_INJECT_ON_COMPACT` | `true` | Preserve context through compaction |
+| `PB_RECORD_SESSIONS` | `false` | Auto-record session summaries as memory |
+
+### How it works
+
+On every chat message, the plugin fetches your project's memory context from the pneural-context server (with a 5-minute cache) and injects it into the system prompt via `experimental.chat.system.transform`.
+
+When opencode compacts a session, the plugin hooks into `experimental.session.compacting` to push a preservation instruction, ensuring the PNEURAL_CTX marker and pinned context survive the compaction.
+
+When `PB_RECORD_SESSIONS=true`, the plugin waits for `session.idle` (agent finishes responding), fetches the session messages via the opencode SDK, and POSTs them to `POST /api/session/record`. The server uses its LLM to produce a caveman-style summary (ultra-compressed, technical, no fluff), then stores it as a temporal memory entry.
+
 ## License
 
 AGPL-3.0-only — see [LICENSE](LICENSE).

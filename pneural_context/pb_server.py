@@ -592,6 +592,39 @@ async def cost_trends(project: str, days: int = 30):
     }
 
 
+# ── Session Recording ──────────────────────────────────────────
+
+
+@app.post("/api/session/record")
+async def record_session(request: Request):
+    body = await request.json()
+    project = body.get("project", "")
+    session_id = body.get("session_id", "")
+    title = body.get("title", "")
+    messages = body.get("messages", [])
+    if not project:
+        raise HTTPException(400, "project required")
+    if not messages:
+        raise HTTPException(400, "messages required")
+    summary = ""
+    if llm_client:
+        try:
+            summary = await llm_client.summarize_session(title, messages)
+        except Exception:
+            logger.warning("Session summarization failed, storing raw title")
+    if not summary:
+        summary = title or f"Session {session_id[:8] if session_id else 'unknown'}"
+    entry_id = await pb_db.add_memory_entry(
+        project, summary, "normal", "temporal", pool=_pool
+    )
+    return {
+        "id": entry_id,
+        "project": project,
+        "summary": summary,
+        "stored": True,
+    }
+
+
 # ── Anchors & Briefing ────────────────────────────────────────
 
 

@@ -129,6 +129,33 @@ class LLMClient:
         )
         return await self._chat([{"role": "user", "content": prompt}])
 
+    async def summarize_session(self, title: str, messages: list[dict]) -> str:
+        parts: list[str] = []
+        for msg in messages[:50]:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if not content:
+                continue
+            parts.append(f"[{role}] {content[:500]}")
+        conversation = "\n".join(parts)
+
+        prompt = (
+            "Summarize this coding session in caveman style. "
+            "Ultra-compressed, technical, no fluff. Preserve ALL technical substance: "
+            "file paths, function names, bug descriptions, fixes, decisions. "
+            "Short noun-verb sentences. Drop articles, pronouns, auxiliary verbs. "
+            "Keep code references verbatim. Max 500 chars.\n\n"
+            f"Session title: {title}\n\n"
+            f"Messages:\n{conversation}\n\n"
+            "Caveman summary:"
+        )
+        result = await self._chat(
+            [{"role": "user", "content": prompt}], temperature=0.2
+        )
+        if len(result) > 500:
+            result = result[:497] + "..."
+        return result
+
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
