@@ -6,6 +6,8 @@ const PB_INJECT_ON_START = process.env.PB_INJECT_ON_START !== "false";
 const PB_INJECT_ON_COMPACT = process.env.PB_INJECT_ON_COMPACT !== "false";
 const PB_RECORD_SESSIONS = process.env.PB_RECORD_SESSIONS === "true";
 const PB_SESSION_RECORD_TYPE = process.env.PB_SESSION_RECORD_TYPE || "temporal";
+const PB_SMART_DEDUP = process.env.PB_SMART_DEDUP !== "false";
+const PB_DEDUP_MESSAGES = parseInt(process.env.PB_DEDUP_MESSAGES || "10", 10);
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -58,6 +60,39 @@ const postJSON = async (path, body, timeout = TIMEOUT_MS * 2) => {
   }
 };
 
+const buildContextMarkdown = (project, entries) => {
+  if (!entries || entries.length === 0) return null;
+  const marker = require("node:crypto").randomBytes(4).toString("hex");
+  const lines = [`<!-- PNEURAL_CTX: ${marker} -->`];
+  lines.push(`# Context: ${project}`);
+  lines.push("");
+  const redInk = entries.filter(
+    (e) => e.priority === "critical" && (e.strength ?? 1.0) >= 0.3
+  );
+  const byType = {};
+  for (const e of entries) {
+    if (e.priority === "critical" && (e.strength ?? 1.0) >= 0.3) continue;
+    const t = e.memory_type || "temporal";
+    byType[t] = byType[t] || [];
+    byType[t].push(e);
+  }
+  if (redInk.length > 0) {
+    lines.push("## Critical (Red Ink)");
+    lines.push("");
+    for (const e of redInk) lines.push(`- ${e.entry || e.content || ""}`);
+    lines.push("");
+  }
+  for (const mtype of ["concept", "procedural", "temporal", "relation"]) {
+    const group = byType[mtype] || [];
+    if (group.length === 0) continue;
+    lines.push(`## ${mtype.toUpperCase()}`);
+    lines.push("");
+    for (const e of group) lines.push(`- ${e.entry || e.content || ""}`);
+    lines.push("");
+  }
+  return { markdown: lines.join("\n"), marker };
+};
+
 const fetchContext = async (project) => {
   const now = Date.now();
   if (contextCache && now - cacheTimestamp < CACHE_TTL_MS && lastMarker) {
@@ -73,15 +108,67 @@ const fetchContext = async (project) => {
   return null;
 };
 
+const fetchSmartContext = async (project, conversation) => {
+  if (!PB_SMART_DEDUP || !conversation) {
+    return fetchContext(project);
+  }
+  const resp = await postJSON("/api/context/smart", {
+    project,
+    conversation,
+  });
+  if (resp && resp.entries && resp.entries.length > 0) {
+    const result = buildContextMarkdown(project, resp.entries);
+    if (result) {
+      contextCache = result.markdown;
+      lastMarker = result.marker;
+      cacheTimestamp = Date.now();
+      return result;
+    }
+  }
+  return fetchContext(project);
+};
+
+const collectConversationText = async (ctx, sessionId) => {
+  try {
+    if (!ctx?.client?.session?.messages) return "";
+    const result = await ctx.client.session.messages({ path: { id: sessionId } });
+    if (!result?.data) return "";
+    const msgs = Array.isArray(result.data) ? result.data : [];
+    const parts = [];
+    for (const m of msgs.slice(-PB_DEDUP_MESSAGES)) {
+      for (const p of m.parts || []) {
+        if (p.type === "text" && p.text) {
+          parts.push(`[${m.info?.role || "user"}] ${p.text.slice(0, 500)}`);
+        }
+      }
+    }
+    return parts.join("\n");
+  } catch (_) {
+    return "";
+  }
+};
+
 export default async (ctx) => {
   const project = resolveProject(ctx);
 
   return {
     "experimental.chat.system.transform": async (_input, output) => {
       if (!PB_INJECT_ON_START) return;
-      const result = await fetchContext(project);
-      if (result && result.markdown) {
-        output.system.push(result.markdown);
+      const sessionId = _input?.session_id || _input?.id || "";
+      let conversation = "";
+      if (PB_SMART_DEDUP && sessionId) {
+        conversation = await collectConversationText(ctx, sessionId);
+      }
+      if (conversation) {
+        const result = await fetchSmartContext(project, conversation);
+        if (result && result.markdown) {
+          output.system.push(result.markdown);
+        }
+      } else {
+        const result = await fetchContext(project);
+        if (result && result.markdown) {
+          output.system.push(result.markdown);
+        }
       }
     },
 

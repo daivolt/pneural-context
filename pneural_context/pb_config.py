@@ -18,6 +18,14 @@ class PBConfig:
     decay_interval_seconds: float = 21600.0
     consolidation_interval_seconds: float = 21600.0
     archive_threshold: float = 0.1
+    embed_backend: str = "ollama"
+    embed_url: str = "http://localhost:11434"
+    embed_model: str = "nomic-embed-text"
+    embed_dimensions: int = 768
+    embed_batch_size: int = 32
+    dedup_threshold_high: float = 0.85
+    dedup_threshold_low: float = 0.55
+    dedup_conversation_messages: int = 10
 
     @classmethod
     def from_env(cls) -> PBConfig:
@@ -38,6 +46,20 @@ class PBConfig:
                 os.environ.get("PNEURAL_CONSOLIDATION_INTERVAL", "21600")
             ),
             archive_threshold=float(os.environ.get("PNEURAL_ARCHIVE_THRESHOLD", "0.1")),
+            embed_backend=os.environ.get("PNEURAL_EMBED_BACKEND", "ollama"),
+            embed_url=os.environ.get("PNEURAL_EMBED_URL", "http://localhost:11434"),
+            embed_model=os.environ.get("PNEURAL_EMBED_MODEL", "nomic-embed-text"),
+            embed_dimensions=int(os.environ.get("PNEURAL_EMBED_DIMENSIONS", "768")),
+            embed_batch_size=int(os.environ.get("PNEURAL_EMBED_BATCH_SIZE", "32")),
+            dedup_threshold_high=float(
+                os.environ.get("PNEURAL_DEDUP_THRESHOLD_HIGH", "0.85")
+            ),
+            dedup_threshold_low=float(
+                os.environ.get("PNEURAL_DEDUP_THRESHOLD_LOW", "0.55")
+            ),
+            dedup_conversation_messages=int(
+                os.environ.get("PNEURAL_DEDUP_CONVERSATION_MESSAGES", "10")
+            ),
         )
 
     @classmethod
