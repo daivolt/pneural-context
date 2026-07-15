@@ -58,8 +58,9 @@ pneural-context gives LLM agents:
 ## Requirements
 
 - Python 3.11+
-- PostgreSQL 14+ (with `pg_trgm` and `uuid-ossp` extensions)
+- PostgreSQL 14+ (with `pg_trgm`, `uuid-ossp`, and `pgvector` extensions)
 - An OpenAI-compatible LLM endpoint (LM Studio, Ollama, OpenAI, etc.)
+- Ollama (for embeddings, default backend)
 
 ## Install
 
@@ -75,6 +76,12 @@ For optional Memoria integration:
 
 ```bash
 pip install -e ".[memoria]"
+```
+
+For Python-based embeddings (alternative to Ollama):
+
+```bash
+pip install -e ".[embeddings]"
 ```
 
 ## Quick Start
@@ -185,7 +192,66 @@ All endpoints use the `/api/` prefix.
 | `POST` | `/api/procedures/outcome` | Record procedure outcome |
 | `POST` | `/api/procedures/retire` | Retire a procedure |
 | `GET` | `/api/decay/status` | Decay status |
+| `POST` | `/api/reindex` | Backfill embeddings for a table |
+| `POST` | `/api/context/smart` | Semantic dedup context injection |
 | `GET` | `/dashboard` | Web dashboard |
+
+### Vector Search & Embeddings (RAG)
+
+pneural-context supports hybrid search combining traditional trigram/ILIKE text search with vector similarity search using pgvector. Results from both methods are merged using Reciprocal Rank Fusion (RRF).
+
+**Setup:**
+
+1. Install pgvector extension in PostgreSQL: `CREATE EXTENSION IF NOT EXISTS vector;`
+2. Set `PNEURAL_EMBED_BACKEND=ollama` (default) and ensure Ollama is running with the embedding model pulled (`ollama pull nomic-embed-text`)
+3. Embeddings are generated on-write when adding memory, consolidated, or procedural entries
+4. Backfill existing entries: `POST /api/reindex` with `{"table": "all"}` or `{"table": "memory"}`
+
+**New endpoints:**
+
+- `GET /api/recall?project=X&q=Y&semantic=true` — hybrid recall (trigram + vector)
+- `GET /api/context?project=X&semantic_query=Y` — hybrid context search
+- `GET /api/procedures/search?project=X&q=Y&semantic=true` — hybrid procedure search
+- `POST /api/context/smart` — semantic dedup context injection
+
+**How it works:**
+
+When `semantic=true` or `semantic_query` is provided, the server generates an embedding vector for the query, runs both trigram search and pgvector similarity search, then merges results using RRF (k=60). This produces better recall than either method alone — trigram catches exact matches, vector catches semantic similarity.
+
+### Semantic Context Dedup
+
+The `POST /api/context/smart` endpoint reduces context injection size by filtering entries that are semantically redundant with the current conversation.
+
+**Three-zone filtering:**
+
+| Similarity to conversation | Action | Reason |
+|---|---|---|
+| ≥ 0.85 (threshold_high) | **Skip** | Redundant — conversation already covers this |
+| 0.55–0.85 | **Inject** | Relevant but not redundant — adds value |
+| < 0.55 (threshold_low) | **Skip** | Irrelevant noise — not topically related |
+
+Critical (red ink) entries with `strength ≥ 0.3` are **always injected** regardless of similarity, ensuring important context is never lost.
+
+**Request:**
+
+```json
+{
+  "project": "my-project",
+  "conversation": "Last 10 messages from the conversation as text"
+}
+```
+
+**Response:**
+
+```json
+{
+  "project": "my-project",
+  "source": "smart_dedup",
+  "dedup_threshold_high": 0.85,
+  "dedup_threshold_low": 0.55,
+  "entries": [...]
+}
+```
 
 ## MCP Server
 
@@ -205,6 +271,7 @@ pneural_context/
 ├── pb_config.py       # Configuration (env vars, JSON)
 ├── pb_db.py           # PostgreSQL database layer (asyncpg)
 ├── pb_schema.sql      # Database schema (auto-applied)
+├── pb_embeddings.py   # Embedding client (Ollama + Python backends)
 ├── pb_engine.py       # Core engine (consolidation, briefing, anchors, decay)
 ├── pb_llm.py          # LLM client (OpenAI-compatible)
 ├── pb_server.py        # FastAPI server with REST API + dashboard
@@ -252,6 +319,14 @@ Memory strength decays over time with configurable half-life. Entries below the 
 | `PNEURAL_DECAY_INTERVAL` | `21600` | Decay loop interval (seconds) |
 | `PNEURAL_CONSOLIDATION_INTERVAL` | `21600` | Consolidation loop interval (seconds) |
 | `PNEURAL_ARCHIVE_THRESHOLD` | `0.1` | Strength threshold for archiving |
+| `PNEURAL_EMBED_BACKEND` | `ollama` | Embedding backend (`ollama` or `python`) |
+| `PNEURAL_EMBED_URL` | `http://localhost:11434` | Ollama API URL |
+| `PNEURAL_EMBED_MODEL` | `nomic-embed-text` | Embedding model name |
+| `PNEURAL_EMBED_DIMENSIONS` | `768` | Vector dimensions (must match model output) |
+| `PNEURAL_EMBED_BATCH_SIZE` | `32` | Embedding batch size for reindex |
+| `PNEURAL_DEDUP_THRESHOLD_HIGH` | `0.85` | Skip threshold (redundant with conversation) |
+| `PNEURAL_DEDUP_THRESHOLD_LOW` | `0.55` | Filter threshold (irrelevant noise) |
+| `PNEURAL_DEDUP_CONVERSATION_MESSAGES` | `10` | Number of recent messages for conversation embedding |
 
 ## Docker
 
@@ -330,6 +405,7 @@ echo '{"project": "my-project-name"}' > .pneural-context.json
 | `PB_INJECT_ON_COMPACT` | `true` | Preserve context through compaction |
 | `PB_RECORD_SESSIONS` | `false` | Auto-record session summaries as memory |
 | `PB_SESSION_RECORD_TYPE` | `temporal` | Memory type for recorded sessions (red, concept, procedural, temporal, relation) |
+| `PB_SMART_DEDUP` | `false` | Enable semantic dedup for context injection |
 
 ### How it works
 
