@@ -23,7 +23,7 @@ def _load_config_file() -> dict[str, object]:
         try:
             return json.loads(CONFIG_PATH.read_text())  # type: ignore[no-any-return]
         except Exception:
-            pass
+            logger.warning("Failed to load config file", exc_info=True)
     return {}
 
 

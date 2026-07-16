@@ -70,5 +70,5 @@ async def recall(
             mem_results = await memoria.recall(q, project=project or "", limit=limit)
             results.extend(mem_results)
         except Exception:
-            pass
+            logger.warning("Memoria recall failed", exc_info=True)
     return {"query": q, "results": results[:limit], "count": len(results)}

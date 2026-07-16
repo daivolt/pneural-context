@@ -1,5 +1,4 @@
-"""
-pneural-context MCP Server — exposes pneural-context features as MCP tools for opencode.
+"""pneural-context MCP Server — exposes pneural-context features as MCP tools for opencode.
 
 Wraps the pneural-context REST API and provides per-feature toggle
 via PB_* environment variables. All features default to enabled.
@@ -9,18 +8,14 @@ Transport: stdio (spawned by opencode as child process)
 
 import json
 import os
-import sys
 import traceback
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent))
 
 import aiohttp
-from help_texts import get_help
-
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
+
+from .help_texts import get_help
 
 PNEURAL_URL = os.environ.get("PNEURAL_URL", "http://localhost:8777")
 
@@ -957,6 +952,12 @@ async def main():
 
 
 if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(main())
+
+
+def run():
     import asyncio
 
     asyncio.run(main())

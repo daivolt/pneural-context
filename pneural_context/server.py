@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from . import pb_db
+from .logging import setup_logging
 from .pb_config import PBConfig
 from .pb_embeddings import EmbeddingClient, create_embedding_client
 from .pb_engine import run_consolidation
@@ -43,6 +44,7 @@ logger = logging.getLogger("pneural_context.server")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config: PBConfig = app.state.config
+    setup_logging(os.environ.get("PNEURAL_LOG_LEVEL", "INFO"))
 
     if not config.database_url:
         config.database_url = os.environ.get("DATABASE_URL", "")

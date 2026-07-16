@@ -53,6 +53,7 @@ mcp = [
 
 [project.scripts]
 pneural-context = "pneural_context.cli:main"
+pneural-context-mcp = "pneural_context.mcp_server.server:run"
 
 [project.urls]
 Homepage = "https://github.com/daivolt/pneural-context"

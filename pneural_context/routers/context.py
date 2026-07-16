@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 import asyncpg
@@ -11,6 +12,7 @@ from ..models.context import SmartContextRequest
 from ..pb_embeddings import get_conversation_embedding
 
 router = APIRouter(prefix="/api/context", tags=["context"])
+logger = logging.getLogger("pneural_context.routers.context")
 
 
 @router.get("")
@@ -38,7 +40,7 @@ async def get_context(
     try:
         consolidated_rows = await pb_db.get_consolidated_for_injection(project, pool=pool)
     except Exception:
-        pass
+        logger.warning("Failed to fetch consolidated entries", exc_info=True)
 
     marker = uuid.uuid4().hex[:8]
     lines = [f"<!-- PNEURAL_CTX: {marker} -->"]
@@ -86,14 +88,14 @@ async def get_context(
         try:
             await pb_db.touch_memory_by_ids(touch_ids, pool=pool)
         except Exception:
-            pass
+            logger.warning("Failed to touch memory entries", exc_info=True)
     if consolidated_rows:
         cons_ids = [c["id"] for c in consolidated_rows if "id" in c]
         if cons_ids:
             try:
                 await pb_db.touch_consolidated_by_ids(cons_ids, pool=pool)
             except Exception:
-                pass
+                logger.warning("Failed to touch consolidated entries", exc_info=True)
 
     typed_sections: dict[str, list[str]] = {}
     for mtype in ("concept", "procedural", "temporal", "relation"):

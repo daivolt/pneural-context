@@ -227,7 +227,7 @@ async def generate_briefing(
                 "consolidated_count": len(consolidated),
             }
         except Exception:
-            pass
+            logger.warning("Briefing generation failed, falling back to raw context")
 
     return {
         "project": project,
