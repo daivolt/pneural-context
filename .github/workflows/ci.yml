@@ -52,8 +52,13 @@ jobs:
           python -m py_compile pneural_context/pb_dashboard.py
           python -m py_compile pneural_context/cli.py
 
-      - name: Run tests
+      - name: Run unit tests
         env:
           PNEURAL_DATABASE_URL: postgresql://pneural:pneural_test@localhost:5432/pneural_test
         run: |
-          pytest tests/ -v
+          pytest tests/ -v -m "not integration"
+
+      - name: Run integration tests
+        if: false
+        run: |
+          pytest tests/test_e2e.py -v

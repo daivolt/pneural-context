@@ -58,3 +58,6 @@ packages = ["pneural_context"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: integration tests requiring live server (deselected in CI)",
+]

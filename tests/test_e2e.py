@@ -17,6 +17,8 @@ from datetime import datetime
 import httpx
 import pytest
 
+pytestmark = pytest.mark.integration
+
 BASE_URL = os.environ.get("PNEURAL_E2E_URL", "http://localhost:8779")
 PROJECT_PREFIX = os.environ.get("PNEURAL_E2E_PROJECT", "e2e-test")
 PROJECT = f"{PROJECT_PREFIX}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
