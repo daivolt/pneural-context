@@ -1,0 +1,22 @@
+graph LR
+    subgraph Three_Zones["Smart Dedup — Three Zones"]
+        direction TB
+        Input["New memory or<br/>conversation message"]
+
+        Input --> Calc["Calculate cosine similarity<br/>between memory and conversation"]
+
+        Calc --> Zone1{"Similarity > 0.85?"}
+        Zone1 -->|"Yes"| Skip["SKIP ZONE<br/><br/>Already covered in<br/>conversation text<br/><br/>e.g. memory='Use Docker compose v2'<br/>conversation='...Docker compose v2...'"]
+        Zone1 -->|"No"| Zone2{"0.55 < Similarity < 0.85?"}
+
+        Zone2 -->|"Yes"| Keep["KEEP ZONE<br/><br/>Relevant but not<br/>redundant — inject it<br/><br/>e.g. memory='Use env vars for secrets'<br/>conversation='...Docker deployment...'"]
+        Zone2 -->|"No"| Noise["NOISE ZONE<br/><br/>Irrelevant — skip<br/><br/>e.g. memory='Meeting notes from Jan'<br/>conversation='...deployment config...'"]
+
+        Input --> Critical{"Is it<br/>Red Ink?"}
+        Critical -->|"Yes (priority=critical)"| Always["ALWAYS INJECT<br/><br/>Regardless of similarity<br/><br/>e.g. 'NEVER commit secrets'<br/>similarity=0.99 → still inject"]
+    end
+
+    style Skip fill:#555,stroke:#888,color:#ccc
+    style Keep fill:#0f3460,stroke:#e94560,color:#fff
+    style Noise fill:#333,stroke:#666,color:#999
+    style Always fill:#e94560,stroke:#fff,color:#fff
