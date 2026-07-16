@@ -28,7 +28,7 @@ def cli():
 def serve(host, port):
     import os
 
-    from .pb_server import create_app
+    from .server import create_app
 
     if host:
         os.environ["PNEURAL_HOST"] = host
