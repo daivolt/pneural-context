@@ -200,8 +200,8 @@ graph LR
 
 | Zone | Similarity | Example | Action |
 |------|-----------|---------|--------|
-| **Skip** | > 0.85 | Memory: "Use Docker compose v2" / Conversation: "...Docker compose v2..." | Don't inject — user already knows |
-| **Keep** | 0.55–0.85 | Memory: "Use env vars for secrets" / Conversation: "...Docker deployment..." | Inject — relevant new info |
+| **Skip** | > 0.85 | Memory: "Use git rebase for updates" / Conversation: "...git rebase for updates..." | Don't inject — user already knows |
+| **Keep** | 0.55–0.85 | Memory: "Use env vars for secrets" / Conversation: "...CI pipeline setup..." | Inject — relevant new info |
 | **Noise** | < 0.55 | Memory: "Meeting notes from Jan" / Conversation: "...deployment config..." | Don't inject — irrelevant |
 | **Always** | Any | Memory: "NEVER commit secrets" (priority=critical) | Always inject, even if similar |
 
