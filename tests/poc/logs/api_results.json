@@ -1,0 +1,188 @@
+{
+  "total": 36,
+  "passed": 35,
+  "failed": 1,
+  "pass_rate": 0.972,
+  "results": [
+    {
+      "name": "01_health",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "02_add_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "03_add_all_priorities",
+      "passed": true,
+      "detail": "added critical, important, normal"
+    },
+    {
+      "name": "04_add_all_types",
+      "passed": true,
+      "detail": "added red, concept, procedural, temporal, relation"
+    },
+    {
+      "name": "05_get_memory",
+      "passed": true,
+      "detail": "status=200, count=17"
+    },
+    {
+      "name": "06_get_full_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "07_get_red_ink",
+      "passed": true,
+      "detail": "status=200, count=3"
+    },
+    {
+      "name": "08_get_by_type",
+      "passed": true,
+      "detail": "all 4 types returned 200"
+    },
+    {
+      "name": "09_set_priority",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "10_set_type",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "11_touch_entry",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "12_boost_entry",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "13_replace_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "14_classify_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "15_delete_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "16_get_context",
+      "passed": true,
+      "detail": "status=200, has_markdown=True"
+    },
+    {
+      "name": "17_smart_context",
+      "passed": true,
+      "detail": "status=200, entries=7"
+    },
+    {
+      "name": "18_context_marker",
+      "passed": "d55ccf37",
+      "detail": "marker=d55ccf37"
+    },
+    {
+      "name": "19_recall",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "20_add_procedure",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "21_list_procedures",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "22_search_procedures",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "23_procedure_outcome",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "24_retire_procedure",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "25_briefing",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "26_anchors",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "ex_27_consolidation_trigger",
+      "passed": false,
+      "detail": "Exception: timed out"
+    },
+    {
+      "name": "28_consolidation_status",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "29_consolidation_get",
+      "passed": true,
+      "detail": "all 3 tiers returned 200"
+    },
+    {
+      "name": "30_decay_status",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "31_decay_cycle",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "32_archive_search",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "33_cost_record",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "34_cost_analysis",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "35_cost_trends",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "36_session_record",
+      "passed": true,
+      "detail": "status=200"
+    }
+  ]
+}

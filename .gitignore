@@ -28,3 +28,7 @@ docs/references/*.pdf
 
 # PoC test reports
 tests/poc/reports/*.json
+# PoC test artifacts
+tests/poc/logs/*.db
+tests/poc/conversation/treatment/
+tests/poc/reports/

@@ -119,7 +119,9 @@ def save_report(report: dict[str, Any], output_dir: Path | None = None) -> Path:
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     json_path = output_dir / f"benchmark_{ts}.json"
-    json_path.write_text(json.dumps(report, indent=2, default=str))
+    json_path.write_text(
+        json.dumps(report, indent=2, default=str, ensure_ascii=False), encoding="utf-8"
+    )
 
     md_path = output_dir / f"benchmark_{ts}.md"
     md_lines = [
@@ -216,7 +218,7 @@ def save_report(report: dict[str, Any], output_dir: Path | None = None) -> Path:
             ]
         )
 
-    md_path.write_text("\n".join(md_lines))
+    md_path.write_text("\n".join(md_lines), encoding="utf-8")
     return json_path
 
 

@@ -16,7 +16,7 @@ class APIExercises:
     def __init__(self, base_url: str = PNEURAL_URL, project: str = PROJECT):
         self.base_url = base_url
         self.project = project
-        self.client = httpx.Client(base_url=base_url, timeout=30)
+        self.client = httpx.Client(base_url=base_url, timeout=120)
         self.results: list[dict[str, Any]] = []
         self.created_ids: list[str] = []
         self._proc_id: str | None = None

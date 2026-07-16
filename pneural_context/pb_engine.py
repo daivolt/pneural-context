@@ -7,6 +7,7 @@ from typing import Any
 import asyncpg
 
 from . import pb_db
+from .db.pool import _get_pool
 from .pb_llm import LLMClient
 
 logger = logging.getLogger("pneural_context.pb_engine")
@@ -49,6 +50,29 @@ async def auto_classify(
     return {"project": project, "classified": classified, "total": len(entries)}
 
 
+async def _update_immediate(
+    project: str,
+    existing: list[dict],
+    content: str,
+    source_sessions: list[str],
+    pool: asyncpg.Pool | None = None,
+) -> None:
+    if not existing:
+        return
+    entry = existing[0]
+    p = await _get_pool(pool)
+    await p.execute(
+        """UPDATE pb_consolidated_memory
+           SET content = $1, source_sessions = $2,
+               last_accessed = extract(epoch from now()),
+               strength = LEAST(strength + 0.1, 1.0)
+           WHERE id = $3""",
+        content,
+        source_sessions,
+        entry["id"],
+    )
+
+
 async def run_consolidation(
     project: str, llm: LLMClient | None = None, pool: asyncpg.Pool | None = None
 ) -> dict[str, Any]:
@@ -58,6 +82,7 @@ async def run_consolidation(
 
     result: dict[str, Any] = {
         "immediate_created": 0,
+        "immediate_updated": 0,
         "insights_created": 0,
         "consolidated_to_timeless": 0,
         "archived_temporal": 0,
@@ -68,75 +93,137 @@ async def run_consolidation(
     important = [e for e in entries if e.get("priority") == "important"]
     normal = [e for e in entries if e.get("priority") == "normal"]
 
+    all_source_sessions = [str(e["id"]) for e in entries[:10] if e.get("id")]
+
+    if critical:
+        immediate_content = " | ".join(e["entry"][:200] for e in critical[:10])
+    elif important:
+        immediate_content = " | ".join(e["entry"][:200] for e in important[:10])
+    else:
+        immediate_content = " | ".join(e["entry"][:200] for e in entries[:10])
+
     existing_immediate = await pb_db.get_consolidated_by_tier(project, "immediate", pool=pool)
     if not existing_immediate:
-        if critical:
-            content = " | ".join(e["entry"][:200] for e in critical[:10])
-        elif important:
-            content = " | ".join(e["entry"][:200] for e in important[:10])
-        else:
-            content = " | ".join(e["entry"][:200] for e in entries[:10])
-        await pb_db.add_consolidated(project, "immediate", content, pool=pool)
+        await pb_db.add_consolidated(
+            project,
+            "immediate",
+            immediate_content,
+            source_sessions=all_source_sessions,
+            pool=pool,
+        )
         result["immediate_created"] = 1
+    else:
+        await _update_immediate(
+            project, existing_immediate, immediate_content, all_source_sessions, pool
+        )
+        result["immediate_updated"] = 1
+
+    existing_consolidated = await pb_db.get_consolidated_by_tier(project, "consolidated", pool=pool)
+    existing_timeless = await pb_db.get_consolidated_by_tier(project, "timeless", pool=pool)
+    existing_contents = {c.get("content", "")[:100] for c in existing_consolidated}
+    existing_contents.update({c.get("content", "")[:100] for c in existing_timeless})
 
     groups_to_consolidate = []
-    if len(important) >= 3:
-        groups_to_consolidate.append(("consolidated", important[:20]))
-    if len(normal) >= 3:
-        groups_to_consolidate.append(("consolidated", normal[:20]))
     if len(critical) >= 3:
-        groups_to_consolidate.append(("consolidated", critical[:20]))
+        groups_to_consolidate.append(("consolidated", critical[:20], "critical"))
+    if len(important) >= 3:
+        groups_to_consolidate.append(("consolidated", important[:20], "important"))
+    if len(normal) >= 3:
+        groups_to_consolidate.append(("consolidated", normal[:20], "normal"))
 
     total_insights = 0
-    for tier, group in groups_to_consolidate:
+    for tier, group, group_priority in groups_to_consolidate:
+        group_source_sessions = [str(e.get("id", "")) for e in group[:20] if e.get("id")]
+
         if llm is None:
             content = " | ".join(e["entry"][:200] for e in group)
-            await pb_db.add_consolidated(project, tier, content, pool=pool)
+            prefix = content[:100]
+            if prefix in existing_contents:
+                continue
+            await pb_db.add_consolidated(
+                project,
+                tier,
+                content,
+                priority=group_priority,
+                source_sessions=group_source_sessions,
+                pool=pool,
+            )
             total_insights += 1
+            existing_contents.add(prefix)
             continue
         try:
             llm_result = await llm.consolidate(group)
             insights = llm_result.get("insights", [])
             mtype = llm_result.get("type", "concept")
-            priority = llm_result.get("priority", "normal")
+            priority = llm_result.get("priority", group_priority)
             for insight in insights:
                 content = insight.strip()
                 if not content:
                     continue
                 if mtype not in ("concept", "procedural", "relation", "temporal"):
                     mtype = "concept"
+                prefix = content[:100]
+                if prefix in existing_contents:
+                    continue
                 await pb_db.add_consolidated(
                     project,
                     tier,
                     content,
                     memory_type=mtype,
                     priority=priority,
+                    source_sessions=group_source_sessions,
                     pool=pool,
                 )
                 total_insights += 1
+                existing_contents.add(prefix)
         except Exception:
             logger.warning(f"LLM consolidation failed for {project}")
             content = " | ".join(e["entry"][:200] for e in group)
-            await pb_db.add_consolidated(project, tier, content, pool=pool)
+            prefix = content[:100]
+            if prefix in existing_contents:
+                continue
+            await pb_db.add_consolidated(
+                project,
+                tier,
+                content,
+                priority=group_priority,
+                source_sessions=group_source_sessions,
+                pool=pool,
+            )
             total_insights += 1
             result["errors"] += 1
+            existing_contents.add(prefix)
 
     result["insights_created"] = total_insights
 
     consolidated_entries = await pb_db.get_consolidated_for_injection(project, pool=pool)
+    promoted_ids: set[int] = set()
+
     for entry in consolidated_entries:
+        if entry.get("tier") == "timeless":
+            continue
+        if entry.get("tier") == "immediate":
+            continue
         if entry.get("priority") == "critical":
             ok = await pb_db.promote_consolidated(entry["id"], "timeless", pool=pool)
             if ok:
                 result["consolidated_to_timeless"] += 1
+                promoted_ids.add(entry["id"])
 
     for entry in consolidated_entries:
+        if entry["id"] in promoted_ids:
+            continue
+        if entry.get("tier") == "timeless":
+            continue
+        if entry.get("tier") == "immediate":
+            continue
         strength = entry.get("strength", 0.5)
         source_count = len(entry.get("source_sessions", []) or [])
-        if (strength >= 0.8 or source_count >= 3) and entry.get("priority") != "critical":
+        if strength >= 0.8 or source_count >= 3:
             ok = await pb_db.promote_consolidated(entry["id"], "timeless", pool=pool)
             if ok:
                 result["consolidated_to_timeless"] += 1
+                promoted_ids.add(entry["id"])
 
     now = time.time()
     thirty_days_ago = now - 30 * 86400

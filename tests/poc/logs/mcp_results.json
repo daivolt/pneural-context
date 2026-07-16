@@ -1,0 +1,153 @@
+{
+  "total": 29,
+  "passed": 29,
+  "failed": 0,
+  "pass_rate": 1.0,
+  "results": [
+    {
+      "name": "pb_add_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_get_memory",
+      "passed": true,
+      "detail": "status=200, count=13"
+    },
+    {
+      "name": "pb_get_full_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_replace_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_get_context",
+      "passed": true,
+      "detail": "has_markdown=True, has_marker=True"
+    },
+    {
+      "name": "pb_recall",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_get_red_ink",
+      "passed": true,
+      "detail": "status=200, count=3"
+    },
+    {
+      "name": "pb_set_priority",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_touch_entry",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_boost_entry",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_briefing",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_get_briefing_anchors",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_list_procedures",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_add_procedure",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_search_procedures",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_procedure_outcome",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_retire_procedure",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_classify_memory",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_set_type",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_trigger_consolidation",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_get_consolidation",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_consolidation_status",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_get_anchors",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_decay_status",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_search_archive",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_cost_analysis",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_cost_trends",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_record_cost",
+      "passed": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "pb_help",
+      "passed": true,
+      "detail": "status=200 (health check as help proxy)"
+    }
+  ]
+}

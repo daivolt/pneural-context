@@ -1,21 +1,17 @@
-"""Benchmark orchestrator — runs control arm, treatment arm, API exercises, and evaluation.
+"""Benchmark orchestrator — single-arm PoC benchmark for pneural-context.
 
-IMPORTANT: This script runs ON the Windows machine (desktop-ryzen) because it connects
-to opencode serve on localhost:4096. The control arm requires opencode serve to be
-restarted with PNEURAL_CONTEXT_URL=http://localhost:9999 (a dummy URL that refuses connections).
+This runs the TREATMENT arm only (plugin enabled with seeded benchmark data).
+The control comparison is done by comparing against existing sessions in the DB
+that were run without the benchmark memory data.
 
 Architecture:
-  Phase 1: Seed memory into pneural-context
-  Phase 2: Run control arm (plugin effectively disabled via dummy URL)
-  Phase 3: Run treatment arm (plugin enabled, PNEURAL_CONTEXT_URL=http://localhost:8779)
+  Phase 1: Check services, clean/seed memory
+  Phase 2: Run treatment arm (10-turn conversation)
+  Phase 3: Copy opencode DB for inspection
   Phase 4: API exercises (all pneural-context endpoints)
   Phase 5: MCP exercises (all MCP tools)
-  Phase 6: Evaluation (faithfulness, DB inspection, code quality, LLM judge)
+  Phase 6: Evaluation (DB inspection, faithfulness, code quality, LLM judge)
   Phase 7: Report generation
-
-NOTE: The control arm requires restarting opencode serve with a different env var.
-This benchmark script CANNOT restart opencode serve automatically — you must do it
-manually between phases 2 and 3.
 """
 
 from __future__ import annotations
@@ -78,35 +74,36 @@ def clean_project() -> None:
         r = client.get("/api/memory", params={"project": PROJECT})
         if r.status_code != 200:
             return
-        for e in r.json():
-            eid = e.get("id") or e.get("entry_id")
-            if eid:
-                client.delete(f"/api/memory/{eid}", params={"project": PROJECT})
+        entries = r.json()
+        if isinstance(entries, list):
+            for e in entries:
+                eid = e.get("id") or e.get("entry_id")
+                if eid:
+                    client.delete(f"/api/memory/{eid}", params={"project": PROJECT})
     print("  Cleaned project data")
 
 
-def copy_opencode_db(arm: str) -> Path:
-    """Copy the opencode DB locally (benchmark runs on the same machine as opencode)."""
-    dest = LOGS_DIR / f"{arm}_opencode.db"
+def copy_opencode_db(suffix: str = "treatment") -> Path:
+    dest = LOGS_DIR / f"{suffix}_opencode.db"
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     src = OPENCODE_DB_PATH
     if not src.exists():
         print(f"  [WARN] opencode DB not found at {src}")
         return dest
     shutil.copy2(str(src), str(dest))
-    print(f"  Copied opencode DB for {arm} ({dest.stat().st_size} bytes)")
+    print(f"  Copied opencode DB ({dest.stat().st_size} bytes)")
     return dest
 
 
-def run_conversation_arm(arm: str, project: str) -> dict[str, Any]:
+def run_conversation(project: str = PROJECT) -> dict[str, Any]:
     from conversation_runner import ConversationRunner
 
     print(f"\n{'='*60}")
-    print(f"  Running {arm} arm conversation")
+    print("  Running treatment arm conversation")
     print(f"{'='*60}")
 
     prompts = json.loads(CONVERSATION_FILE.read_text())
-    runner = ConversationRunner(arm=arm, project=project)
+    runner = ConversationRunner(arm="treatment", project=project)
 
     session_id = None
     results = []
@@ -116,12 +113,12 @@ def run_conversation_arm(arm: str, project: str) -> dict[str, Any]:
     finally:
         runner.close()
 
-    print(f"  {arm} arm completed: {len(results)} turns")
+    print(f"  Treatment arm completed: {len(results)} turns")
 
-    db_path = copy_opencode_db(arm)
+    db_path = copy_opencode_db("treatment")
 
     return {
-        "arm": arm,
+        "arm": "treatment",
         "session_id": session_id,
         "results": results,
         "db_path": str(db_path),
@@ -159,72 +156,113 @@ def run_mcp_exercises() -> dict[str, Any]:
     return exercise.summary()
 
 
-def run_faithfulness(control_dir: Path, treatment_dir: Path) -> dict[str, Any]:
+def run_faithfulness(treatment_dir: Path) -> dict[str, Any]:
     print(f"\n{'='*60}")
     print("  Running faithfulness analysis")
     print(f"{'='*60}")
 
-    ctrl_responses = []
     treat_responses = []
     for i in range(1, 11):
-        ctrl_file = control_dir / f"turn_{i:02d}_response.txt"
         treat_file = treatment_dir / f"turn_{i:02d}_response.txt"
-        ctrl_responses.append(ctrl_file.read_text() if ctrl_file.exists() else "")
         treat_responses.append(treat_file.read_text() if treat_file.exists() else "")
 
-    from faithfulness import compare_faithfulness
+    from faithfulness import check_faithfulness_per_turn
 
-    return compare_faithfulness(ctrl_responses, treat_responses)
+    per_turn = check_faithfulness_per_turn(treat_responses)
+    avg_ratio = sum(r["match_ratio"] for r in per_turn) / len(per_turn) if per_turn else 0
+    return {
+        "per_turn": per_turn,
+        "avg_match_ratio": round(avg_ratio, 3),
+        "total_seeds_matched": sum(r["matched_seeds"] for r in per_turn),
+    }
 
 
-def run_db_inspection(
-    control_db: Path, treatment_db: Path, control_sid: str | None, treatment_sid: str | None
-) -> dict[str, Any]:
+def run_db_inspection(db_path: Path, session_id: str | None) -> dict[str, Any]:
     print(f"\n{'='*60}")
     print("  Running DB inspection")
     print(f"{'='*60}")
 
-    from db_inspector import compare_dbs
+    from db_inspector import inspect_opencode_db
 
-    return compare_dbs(control_db, treatment_db, control_sid, treatment_sid)
+    return inspect_opencode_db(db_path, session_id)
 
 
-def run_code_quality(control_dir: Path, treatment_dir: Path) -> dict[str, Any]:
+def run_code_quality(treatment_dir: Path) -> dict[str, Any]:
     print(f"\n{'='*60}")
     print("  Running code quality analysis")
     print(f"{'='*60}")
 
-    from code_quality import compare_quality
+    from code_quality import analyze_response
 
-    return compare_quality(control_dir, treatment_dir)
+    quality_scores = []
+    for i in range(1, 11):
+        resp_file = treatment_dir / f"turn_{i:02d}_response.txt"
+        if resp_file.exists():
+            text = resp_file.read_text()
+            if text.strip():
+                quality_scores.append(analyze_response(text))
+
+    if not quality_scores:
+        return {"error": "No responses to analyze"}
+
+    avg_scores = {}
+    for key in quality_scores[0]:
+        if isinstance(quality_scores[0][key], int | float):
+            avg_scores[key] = round(sum(s[key] for s in quality_scores) / len(quality_scores), 2)
+
+    return {
+        "per_turn_count": len(quality_scores),
+        "averages": avg_scores,
+    }
 
 
-def run_llm_judge(control_dir: Path, treatment_dir: Path) -> dict[str, Any]:
+def run_llm_judge(treatment_dir: Path) -> dict[str, Any]:
     api_key = os.environ.get("DEEPSEEK_API_KEY", "")
     if not api_key:
         print("  [SKIP] DEEPSEEK_API_KEY not set, skipping LLM judge")
-        return {
-            "error": "DEEPSEEK_API_KEY not set",
-            "per_turn": [],
-            "overall": {"verdict": "Skipped"},
-        }
+        return {"error": "DEEPSEEK_API_KEY not set", "per_turn": [], "overall_verdict": "Skipped"}
 
     print(f"\n{'='*60}")
     print("  Running LLM judge (DeepSeek)")
     print(f"{'='*60}")
 
-    from llm_judge import judge_all_turns
-
-    ctrl_responses = []
     treat_responses = []
     for i in range(1, 11):
-        ctrl_file = control_dir / f"turn_{i:02d}_response.txt"
         treat_file = treatment_dir / f"turn_{i:02d}_response.txt"
-        ctrl_responses.append(ctrl_file.read_text() if ctrl_file.exists() else "")
         treat_responses.append(treat_file.read_text() if treat_file.exists() else "")
 
+    from faithfulness import FAITHFULNESS_TERMS
+
     prompts = json.loads(CONVERSATION_FILE.read_text())
-    return judge_all_turns(ctrl_responses, treat_responses, prompts, api_key)
+
+    from llm_judge import judge_pair
+
+    per_turn = []
+    for i, (resp, _prompt) in enumerate(zip(treat_responses, prompts, strict=False)):
+        if not resp.strip():
+            per_turn.append({"turn": i + 1, "error": "empty response", "final_verdict": "Skipped"})
+            continue
+
+        seed_terms = " ".join(f"- {info['description']}" for info in FAITHFULNESS_TERMS.values())
+        task = f"Build a FastAPI task management API. Relevant project knowledge: {seed_terms}"
+
+        result = judge_pair(
+            task,
+            "[no context baseline - this response was generated without project-specific memory]",
+            resp,
+            api_key,
+        )
+        result["turn"] = i + 1
+        per_turn.append(result)
+        time.sleep(2)
+
+    return {
+        "per_turn": per_turn,
+        "overall_verdict": "Treatment preferred"
+        if sum(1 for r in per_turn if r.get("final_verdict") in ("Treatment", "B"))
+        > len(per_turn) / 2
+        else "Mixed",
+    }
 
 
 def main() -> None:
@@ -234,7 +272,7 @@ def main() -> None:
     print("  PNEURAL-CONTEXT PoC BENCHMARK")
     print("=" * 60)
 
-    for d in [CONVERSATION_DIR / "control", CONVERSATION_DIR / "treatment", LOGS_DIR, REPORTS_DIR]:
+    for d in [CONVERSATION_DIR / "treatment", LOGS_DIR, REPORTS_DIR]:
         d.mkdir(parents=True, exist_ok=True)
 
     if phase == 0 or phase == 1:
@@ -255,76 +293,77 @@ def main() -> None:
         seed_memory()
 
     if phase == 0 or phase == 3:
-        print("\n[3/7] Running control arm...")
-        print("  NOTE: For control arm, opencode serve should be running with")
-        print("  PNEURAL_CONTEXT_URL=http://localhost:9999 (dummy URL).")
-        print("  If it's currently running with the treatment URL, you need to")
-        print("  restart opencode serve with the control env var first.")
-        print("  Press Ctrl+C to abort, or wait 10s to continue...")
-        time.sleep(10)
-        control = run_conversation_arm("control", PROJECT)
-
-        with open(LOGS_DIR / "control_results.json", "w") as f:
-            json.dump(control, f, indent=2, default=str)
-        print(f"  Control results saved to {LOGS_DIR / 'control_results.json'}")
-
-        if phase == 3:
-            print("\n  [IMPORTANT] Control arm complete. Now restart opencode serve")
-            print("  with PNEURAL_CONTEXT_URL=http://localhost:8779 (treatment URL)")
-            print("  then run: python benchmark.py 4")
-            return
-
-    if phase == 0 or phase == 4:
-        print("\n[4/7] Running treatment arm...")
-        treatment = run_conversation_arm("treatment", PROJECT)
-
+        print("\n[3/7] Running treatment arm conversation...")
+        treatment = run_conversation()
         with open(LOGS_DIR / "treatment_results.json", "w") as f:
             json.dump(treatment, f, indent=2, default=str)
         print(f"  Treatment results saved to {LOGS_DIR / 'treatment_results.json'}")
 
-    if phase == 0 or phase == 5:
-        print("\n[5/7] Running API exercises...")
+    if phase == 0 or phase == 4:
+        print("\n[4/7] Running API exercises...")
         api_results = run_api_exercises()
+        with open(LOGS_DIR / "api_results.json", "w") as f:
+            json.dump(api_results, f, indent=2, default=str)
+
+    if phase == 0 or phase == 5:
+        print("\n[5/7] Running MCP exercises...")
+        mcp_results = run_mcp_exercises()
+        with open(LOGS_DIR / "mcp_results.json", "w") as f:
+            json.dump(mcp_results, f, indent=2, default=str)
 
     if phase == 0 or phase == 6:
-        print("\n[6/7] Running MCP exercises...")
-        mcp_results = run_mcp_exercises()
-
-    if phase == 0 or phase == 7:
-        print("\n[7/7] Running evaluation...")
-
-        control_dir = CONVERSATION_DIR / "control"
+        print("\n[6/7] Running evaluation...")
         treatment_dir = CONVERSATION_DIR / "treatment"
-
-        control_db = LOGS_DIR / "control_opencode.db"
-        treatment_db = LOGS_DIR / "treatment_opencode.db"
-
-        control_results_file = LOGS_DIR / "control_results.json"
         treatment_results_file = LOGS_DIR / "treatment_results.json"
 
-        control_sid = None
         treatment_sid = None
-        if control_results_file.exists():
-            control_sid = json.loads(control_results_file.read_text()).get("session_id")
         if treatment_results_file.exists():
             treatment_sid = json.loads(treatment_results_file.read_text()).get("session_id")
 
-        faithfulness = run_faithfulness(control_dir, treatment_dir)
-        db_inspection = run_db_inspection(control_db, treatment_db, control_sid, treatment_sid)
-        code_quality = run_code_quality(control_dir, treatment_dir)
-        llm_judge = run_llm_judge(control_dir, treatment_dir)
+        treatment_db = LOGS_DIR / "treatment_opencode.db"
+
+        db_inspection = run_db_inspection(treatment_db, treatment_sid)
+        faithfulness = run_faithfulness(treatment_dir)
+        code_quality = run_code_quality(treatment_dir)
+        llm_judge = run_llm_judge(treatment_dir)
+
+        with open(LOGS_DIR / "db_inspection.json", "w") as f:
+            json.dump(db_inspection, f, indent=2, default=str)
+        with open(LOGS_DIR / "faithfulness.json", "w") as f:
+            json.dump(faithfulness, f, indent=2, default=str)
+        with open(LOGS_DIR / "code_quality.json", "w") as f:
+            json.dump(code_quality, f, indent=2, default=str)
+        with open(LOGS_DIR / "llm_judge.json", "w") as f:
+            json.dump(llm_judge, f, indent=2, default=str)
+
+    if phase == 0 or phase == 7:
+        print("\n[7/7] Generating report...")
+        treatment_results_file = LOGS_DIR / "treatment_results.json"
+        api_results_file = LOGS_DIR / "api_results.json"
+        mcp_results_file = LOGS_DIR / "mcp_results.json"
+        db_inspection_file = LOGS_DIR / "db_inspection.json"
+        faithfulness_file = LOGS_DIR / "faithfulness.json"
+        code_quality_file = LOGS_DIR / "code_quality.json"
+        llm_judge_file = LOGS_DIR / "llm_judge.json"
+
+        def load_result(path: Path) -> dict:
+            if path.exists():
+                return json.loads(path.read_text())
+            return {}
 
         from report_generator import generate_report, save_report
 
         report = generate_report(
-            api_exercises=api_results if phase in (0, 5) else {},
-            mcp_exercises=mcp_results if phase in (0, 6) else {},
-            faithfulness=faithfulness,
-            db_inspection=db_inspection,
-            code_quality=code_quality,
-            llm_judge=llm_judge,
-            control_session_id=control_sid,
-            treatment_session_id=treatment_sid,
+            api_exercises=api_results if phase in (0, 4) else load_result(api_results_file),
+            mcp_exercises=mcp_results if phase in (0, 5) else load_result(mcp_results_file),
+            faithfulness=faithfulness if phase in (0, 6) else load_result(faithfulness_file),
+            db_inspection=db_inspection if phase in (0, 6) else load_result(db_inspection_file),
+            code_quality=code_quality if phase in (0, 6) else load_result(code_quality_file),
+            llm_judge=llm_judge if phase in (0, 6) else load_result(llm_judge_file),
+            control_session_id=None,
+            treatment_session_id=treatment_sid
+            if phase in (0, 3, 6)
+            else load_result(treatment_results_file).get("session_id"),
             conversation_prompts=json.loads(CONVERSATION_FILE.read_text()),
         )
 
@@ -332,8 +371,8 @@ def main() -> None:
         print(f"\n{'='*60}")
         print("  BENCHMARK COMPLETE")
         print(f"  Report: {json_path}")
-        print(f"  Overall: {report['overall_verdict']}")
-        print(f"  Summary: {report['summary']}")
+        print(f"  Overall: {report.get('overall_verdict', 'unknown')}")
+        print(f"  Summary: {report.get('summary', 'no summary')}")
         print(f"{'='*60}")
 
         clean_project()

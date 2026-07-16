@@ -1,0 +1,83 @@
+{
+  "db_path": "C:\\pneural-context\\tests\\poc\\logs\\treatment_opencode.db",
+  "session_id": "ses_092ddd637ffeGy5UtrRN9lym40",
+  "tables": [
+    "__drizzle_migrations",
+    "account",
+    "account_state",
+    "control_account",
+    "event",
+    "event_sequence",
+    "message",
+    "part",
+    "permission",
+    "project",
+    "session",
+    "session_entry",
+    "session_share",
+    "todo",
+    "workspace"
+  ],
+  "session_count": 41,
+  "recent_sessions": [
+    {
+      "id": "ses_092fc83a7ffe5HmdicHGSHFYhK",
+      "title": "poc-benchmark-treatment",
+      "time_created": 1784240372824
+    },
+    {
+      "id": "ses_09300d942ffeWFdy0TnnBg1Ul9",
+      "title": "poc-test-123",
+      "time_created": 1784240088765
+    },
+    {
+      "id": "ses_09315f79fffexJMgj0igGKaldm",
+      "title": "test-benchmark",
+      "time_created": 1784238704736
+    },
+    {
+      "id": "ses_0933de4b7ffeZDcpZYvfdxj6Ck",
+      "title": "poc-compaction",
+      "time_created": 1784236088137
+    },
+    {
+      "id": "ses_0933e7083ffee3qIGI3BshguGV",
+      "title": "poc-session-recording",
+      "time_created": 1784236052348
+    },
+    {
+      "id": "ses_0933efbedffe0DT9L4VnrXaNc4",
+      "title": "poc-context-injection",
+      "time_created": 1784236016659
+    },
+    {
+      "id": "ses_09358a5ccffeHTOvalRu8oaoQE",
+      "title": "poc-compaction",
+      "time_created": 1784234334771
+    },
+    {
+      "id": "ses_09359141effeyBlAe3iq6SLj6r",
+      "title": "poc-session-recording",
+      "time_created": 1784234306529
+    },
+    {
+      "id": "ses_093598039ffe026Gv1XryxxTzo",
+      "title": "poc-context-injection",
+      "time_created": 1784234278854
+    },
+    {
+      "id": "ses_0935e8049ffecZZL03LxeoTGm7",
+      "title": "poc-compaction",
+      "time_created": 1784233951158
+    }
+  ],
+  "session_id_used": "ses_092ddd637ffeGy5UtrRN9lym40",
+  "message_count": 0,
+  "messages": [],
+  "part_count": 0,
+  "parts": [],
+  "pneural_ctx_found_in_db": false,
+  "pneural_ctx_locations": [],
+  "assistant_message_count": 0,
+  "marker_in_messages": false
+}

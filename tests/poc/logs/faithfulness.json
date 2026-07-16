@@ -1,0 +1,904 @@
+{
+  "per_turn": [
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [
+            "pydantic",
+            "validation"
+          ],
+          "matched": true,
+          "match_count": 2
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [
+            "asyncpg",
+            "connection pool"
+          ],
+          "matched": true,
+          "match_count": 2
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [
+            "routers/"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 3,
+      "total_seeds": 8,
+      "match_ratio": 0.375,
+      "all_terms_found": [
+        "pydantic",
+        "validation",
+        "asyncpg",
+        "connection pool",
+        "routers/"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 1,
+        "procedural": 1,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 1,
+      "response_length": 872
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [
+            "pydantic"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [
+            "type hints",
+            "type hints"
+          ],
+          "matched": true,
+          "match_count": 2
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [
+            "user_id"
+          ],
+          "matched": true,
+          "match_count": 1
+        }
+      },
+      "matched_seeds": 3,
+      "total_seeds": 8,
+      "match_ratio": 0.375,
+      "all_terms_found": [
+        "pydantic",
+        "type hints",
+        "type hints",
+        "user_id"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 1,
+        "procedural": 0,
+        "temporal": 0,
+        "relation": 1
+      },
+      "turn": 2,
+      "response_length": 929
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [
+            "asyncpg",
+            "connection pool",
+            "pooling"
+          ],
+          "matched": true,
+          "match_count": 3
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 1,
+      "total_seeds": 8,
+      "match_ratio": 0.125,
+      "all_terms_found": [
+        "asyncpg",
+        "connection pool",
+        "pooling"
+      ],
+      "by_type": {
+        "red_ink": 0,
+        "concept": 1,
+        "procedural": 0,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 3,
+      "response_length": 1552
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [
+            "pydantic"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [
+            "routers/"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 2,
+      "total_seeds": 8,
+      "match_ratio": 0.25,
+      "all_terms_found": [
+        "pydantic",
+        "routers/"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 0,
+        "procedural": 1,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 4,
+      "response_length": 3475
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [
+            "pydantic",
+            "validate",
+            "422",
+            "validation"
+          ],
+          "matched": true,
+          "match_count": 4
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [
+            "routers/"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 2,
+      "total_seeds": 8,
+      "match_ratio": 0.25,
+      "all_terms_found": [
+        "pydantic",
+        "validate",
+        "422",
+        "validation",
+        "routers/"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 0,
+        "procedural": 1,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 5,
+      "response_length": 3174
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [
+            "asyncclient"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [
+            "pytest",
+            "httpx"
+          ],
+          "matched": true,
+          "match_count": 2
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 2,
+      "total_seeds": 8,
+      "match_ratio": 0.25,
+      "all_terms_found": [
+        "asyncclient",
+        "pytest",
+        "httpx"
+      ],
+      "by_type": {
+        "red_ink": 0,
+        "concept": 0,
+        "procedural": 2,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 6,
+      "response_length": 2940
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [
+            "credentials"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 1,
+      "total_seeds": 8,
+      "match_ratio": 0.125,
+      "all_terms_found": [
+        "credentials"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 0,
+        "procedural": 0,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 7,
+      "response_length": 1925
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [
+            "422"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [
+            "routers/"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 2,
+      "total_seeds": 8,
+      "match_ratio": 0.25,
+      "all_terms_found": [
+        "422",
+        "routers/"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 0,
+        "procedural": 1,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 8,
+      "response_length": 4944
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [
+            "422"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [
+            "routers/"
+          ],
+          "matched": true,
+          "match_count": 1
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [
+            "pagination",
+            "limit",
+            "offset"
+          ],
+          "matched": true,
+          "match_count": 3
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 3,
+      "total_seeds": 8,
+      "match_ratio": 0.375,
+      "all_terms_found": [
+        "422",
+        "routers/",
+        "pagination",
+        "limit",
+        "offset"
+      ],
+      "by_type": {
+        "red_ink": 1,
+        "concept": 0,
+        "procedural": 1,
+        "temporal": 1,
+        "relation": 0
+      },
+      "turn": 9,
+      "response_length": 4661
+    },
+    {
+      "per_seed": {
+        "1": {
+          "seed_id": 1,
+          "type": "red_ink",
+          "description": "Never hardcode database credentials",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "2": {
+          "seed_id": 2,
+          "type": "red_ink",
+          "description": "Always validate input with Pydantic models",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "3": {
+          "seed_id": 3,
+          "type": "concept",
+          "description": "FastAPI with asyncpg connection pooling",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "4": {
+          "seed_id": 4,
+          "type": "concept",
+          "description": "Bloomberg engineering standards",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "5": {
+          "seed_id": 5,
+          "type": "procedural",
+          "description": "Endpoint creation workflow",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "6": {
+          "seed_id": 6,
+          "type": "procedural",
+          "description": "Testing conventions",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "7": {
+          "seed_id": 7,
+          "type": "temporal",
+          "description": "Previous session context about pagination",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        },
+        "8": {
+          "seed_id": 8,
+          "type": "relation",
+          "description": "Task-User relationship",
+          "found_terms": [],
+          "matched": false,
+          "match_count": 0
+        }
+      },
+      "matched_seeds": 0,
+      "total_seeds": 8,
+      "match_ratio": 0.0,
+      "all_terms_found": [],
+      "by_type": {
+        "red_ink": 0,
+        "concept": 0,
+        "procedural": 0,
+        "temporal": 0,
+        "relation": 0
+      },
+      "turn": 10,
+      "response_length": 0
+    }
+  ],
+  "avg_match_ratio": 0.237,
+  "total_seeds_matched": 19
+}
