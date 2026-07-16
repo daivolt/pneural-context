@@ -27,7 +27,7 @@ async def add_memory_entry(
         priority,
         mt,
     )
-    entry_id = row["id"]
+    entry_id: int = row["id"]
     if _embedding_client:
         try:
             vec = await _embedding_client.embed(text)
@@ -106,7 +106,7 @@ async def update_memory_priority(
         project,
         index,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
 
 
 async def update_memory_type(
@@ -122,7 +122,7 @@ async def update_memory_type(
         project,
         index,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
 
 
 async def update_memory_type_by_id(
@@ -137,7 +137,7 @@ async def update_memory_type_by_id(
         memory_type,
         entry_id,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
 
 
 async def touch_memory_access(project: str, index: int, pool: asyncpg.Pool | None = None) -> bool:
@@ -150,7 +150,7 @@ async def touch_memory_access(project: str, index: int, pool: asyncpg.Pool | Non
         project,
         index,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
 
 
 async def touch_memory_by_ids(ids: list[int], pool: asyncpg.Pool | None = None) -> int:
@@ -213,7 +213,7 @@ async def delete_memory_entry(project: str, index: int, pool: asyncpg.Pool | Non
         project,
         index,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
 
 
 async def get_memory_entry_id(

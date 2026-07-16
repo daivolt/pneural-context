@@ -41,7 +41,7 @@ class EmbeddingClient:
             logger.warning("Batch embedding failed (%d texts)", len(texts), exc_info=True)
             return [None] * len(texts)
 
-    async def close(self):
+    async def close(self) -> None:
         if self._client is not None:
             await self._client.close()
             self._client = None
@@ -66,7 +66,7 @@ class OllamaEmbeddingClient:
         ) as resp:
             resp.raise_for_status()
             data = await resp.json()
-            return data["embedding"]
+            return list(data["embedding"])
 
     async def embed_batch(self, texts: list[str]) -> list[list[float] | None]:
         results: list[list[float] | None] = []
@@ -79,7 +79,7 @@ class OllamaEmbeddingClient:
                 results.append(None)
         return results
 
-    async def close(self):
+    async def close(self) -> None:
         if self._session and not self._session.closed:
             await self._session.close()
 
@@ -90,7 +90,7 @@ class PythonEmbeddingClient:
         self.dimensions = dimensions
         self._model: Any = None
 
-    def _load_model(self):
+    def _load_model(self) -> None:
         if self._model is None:
             try:
                 from sentence_transformers import SentenceTransformer
@@ -108,7 +108,7 @@ class PythonEmbeddingClient:
 
         loop = asyncio.get_running_loop()
         vec = await loop.run_in_executor(None, self._model.encode, text)
-        return vec.tolist()
+        return list(vec.tolist())
 
     async def embed_batch(self, texts: list[str]) -> list[list[float] | None]:
         self._load_model()
@@ -125,7 +125,7 @@ class PythonEmbeddingClient:
                 results.append(None)
         return results
 
-    async def close(self):
+    async def close(self) -> None:
         pass
 
 
@@ -134,7 +134,7 @@ _CACHE_TTL = 300.0
 _CACHE_MAX_SIZE = 10000
 
 
-def _evict_cache():
+def _evict_cache() -> None:
     now = time.time()
     expired = [k for k, (_, ts) in _conversation_cache.items() if now - ts >= _CACHE_TTL]
     for k in expired:
@@ -157,15 +157,15 @@ async def get_conversation_embedding(
     key = _cache_key(project, conversation)
     now = time.time()
     if key in _conversation_cache:
-        vec, ts = _conversation_cache[key]
+        cached_vec, ts = _conversation_cache[key]
         if now - ts < _CACHE_TTL:
-            return vec
-    vec = await client.embed(conversation)
-    if vec is None:
+            return cached_vec
+    result = await client.embed(conversation)
+    if result is None:
         return None
-    _conversation_cache[key] = (vec, now)
+    _conversation_cache[key] = (result, now)
     _evict_cache()
-    return vec
+    return result
 
 
 def create_embedding_client(config: Any) -> EmbeddingClient | None:

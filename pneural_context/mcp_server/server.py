@@ -9,6 +9,7 @@ Transport: stdio (spawned by opencode as child process)
 import json
 import os
 import traceback
+from typing import Any
 
 import aiohttp
 from mcp.server import Server
@@ -75,22 +76,22 @@ for feat, tools in FEATURE_TOOLS.items():
         TOOL_TO_FEATURE[t] = feat
 
 
-async def api_get(path: str, params: dict | None = None) -> dict:
+async def api_get(path: str, params: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{PNEURAL_URL}{path}", params=params) as resp:
-            return await resp.json()
+            return dict(await resp.json())
 
 
-async def api_post(path: str, json_data: dict | None = None) -> dict:
+async def api_post(path: str, json_data: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
         async with session.post(f"{PNEURAL_URL}{path}", json=json_data) as resp:
-            return await resp.json()
+            return dict(await resp.json())
 
 
-async def api_patch(path: str, json_data: dict | None = None) -> dict:
+async def api_patch(path: str, json_data: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
         async with session.patch(f"{PNEURAL_URL}{path}", json=json_data) as resp:
-            return await resp.json()
+            return dict(await resp.json())
 
 
 def disabled_msg(feature: str) -> str:
@@ -946,7 +947,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         ]
 
 
-async def main():
+async def main() -> None:
     async with stdio_server() as (read_stream, write_stream):
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
@@ -957,7 +958,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 
-def run():
+def run() -> None:
     import asyncio
 
     asyncio.run(main())

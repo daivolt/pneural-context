@@ -31,7 +31,7 @@ async def add_procedure(
         json.dumps(steps),
         proven,
     )
-    proc_id = row["id"]
+    proc_id: int = row["id"]
     if _embedding_client:
         try:
             embed_text = f"{task_pattern} {' '.join(steps)}"
@@ -169,4 +169,4 @@ async def retire_procedure(proc_id: int, pool: asyncpg.Pool | None = None) -> bo
         "UPDATE pb_procedural_memory SET retired = true WHERE id = $1",
         proc_id,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))

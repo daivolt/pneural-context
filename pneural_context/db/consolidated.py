@@ -45,7 +45,7 @@ async def add_consolidated(
         priority,
         strength,
     )
-    consol_id = row["id"]
+    consol_id: int = row["id"]
     if _embedding_client:
         try:
             vec = await _embedding_client.embed(content)
@@ -149,7 +149,7 @@ async def promote_consolidated(
         new_tier,
         entry_id,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
 
 
 async def touch_consolidated_by_ids(ids: list[int], pool: asyncpg.Pool | None = None) -> int:

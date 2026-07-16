@@ -35,7 +35,7 @@ async def record_memory_cost(
         task_outcome or None,
         bd,
     )
-    return row["id"]
+    return int(row["id"])
 
 
 async def get_memory_costs(

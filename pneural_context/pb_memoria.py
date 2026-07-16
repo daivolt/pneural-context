@@ -35,15 +35,15 @@ class MemoriaBridge:
         resp = await client.get(f"{self.url}/api/recall", params=params)
         resp.raise_for_status()
         data = resp.json()
-        return data.get("results", [])
+        return list(data.get("results", []))
 
     async def get_sessions(self, project: str) -> list[dict[str, Any]]:
         client = await self._ensure_client()
         resp = await client.get(f"{self.url}/api/sessions", params={"project": project})
         resp.raise_for_status()
         data = resp.json()
-        return data.get("sessions", [])
+        return list(data.get("sessions", []))
 
-    async def close(self):
+    async def close(self) -> None:
         if self._client and not self._client.is_closed:
             await self._client.aclose()

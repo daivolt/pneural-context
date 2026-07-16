@@ -28,6 +28,7 @@ dependencies = [
     "click>=8.1.0",
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
+    "alembic>=1.13.0",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +45,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "httpx>=0.27.0",
     "ruff>=0.5.0",
+    "sqlalchemy[asyncio]>=2.0.0",
     "mypy>=1.10.0",
 ]
 
@@ -63,13 +65,26 @@ Issues = "https://github.com/daivolt/pneural-context/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["pneural_context"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"pneural_context/pb_schema.sql" = "pneural_context/pb_schema.sql"
+"pneural_context/static/dashboard.html" = "pneural_context/static/dashboard.html"
+"alembic" = "alembic"
+"alembic.ini" = "alembic.ini"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "integration: integration tests requiring live server (deselected in CI)",
 ]
-addopts = "--cov=pneural_context --cov-fail-under=0 --cov-report=term-missing"
+addopts = "--cov=pneural_context --cov-fail-under=70 --cov-report=term-missing"
+
+[tool.coverage.run]
+omit = [
+    "pneural_context/cli.py",
+    "pneural_context/mcp_server/*",
+    "pneural_context/pb_server.py",
+]
 
 [tool.ruff]
 line-length = 100
@@ -87,5 +102,5 @@ warn_return_any = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 [[tool.mypy.overrides]]
-module = ["asyncpg.*", "aiohttp.*", "mcp.*", "sentence_transformers.*"]
+module = ["asyncpg.*", "aiohttp.*", "mcp.*", "sentence_transformers.*", "alembic.*", "sqlalchemy.*"]
 ignore_missing_imports = true

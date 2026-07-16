@@ -18,14 +18,14 @@ async def _get_pool(config: PBConfig) -> asyncpg.Pool:
 
 
 @click.group()
-def cli():
+def cli() -> None:
     pass
 
 
 @cli.command()
 @click.option("--host", default=None, help="Host to bind")
 @click.option("--port", default=None, type=int, help="Port to bind")
-def serve(host, port):
+def serve(host: str | None, port: int | None) -> None:
     import os
 
     from .server import create_app
@@ -43,7 +43,7 @@ def serve(host, port):
 
 
 @cli.group()
-def memory():
+def memory() -> None:
     pass
 
 
@@ -61,8 +61,8 @@ def memory():
     default=None,
     type=click.Choice(["red", "concept", "procedural", "temporal", "relation"]),
 )
-def memory_add(project, text, priority, memory_type):
-    async def _run():
+def memory_add(project: str, text: str, priority: str, memory_type: str | None) -> None:
+    async def _run() -> None:
         config = _get_config()
         pool = await _get_pool(config)
         pb_db.init_pool(pool)
@@ -75,8 +75,8 @@ def memory_add(project, text, priority, memory_type):
 
 @memory.command("list")
 @click.option("--project", "-p", required=True)
-def memory_list(project):
-    async def _run():
+def memory_list(project: str) -> None:
+    async def _run() -> None:
         config = _get_config()
         pool = await _get_pool(config)
         pb_db.init_pool(pool)
@@ -92,14 +92,14 @@ def memory_list(project):
 
 
 @cli.group()
-def procedures():
+def procedures() -> None:
     pass
 
 
 @procedures.command("list")
 @click.option("--project", "-p", required=True)
-def proc_list(project):
-    async def _run():
+def proc_list(project: str) -> None:
+    async def _run() -> None:
         config = _get_config()
         pool = await _get_pool(config)
         pb_db.init_pool(pool)
@@ -117,8 +117,8 @@ def proc_list(project):
 @procedures.command("search")
 @click.option("--project", "-p", required=True)
 @click.option("--query", "-q", required=True)
-def proc_search(project, query):
-    async def _run():
+def proc_search(project: str, query: str) -> None:
+    async def _run() -> None:
         config = _get_config()
         pool = await _get_pool(config)
         pb_db.init_pool(pool)
@@ -132,8 +132,8 @@ def proc_search(project, query):
 
 @cli.command()
 @click.option("--project", "-p", required=True)
-def consolidation(project):
-    async def _run():
+def consolidation(project: str) -> None:
+    async def _run() -> None:
         from .pb_engine import run_consolidation
         from .pb_llm import LLMClient
 
@@ -151,8 +151,8 @@ def consolidation(project):
 
 @cli.command()
 @click.option("--project", "-p", required=True)
-def decay(project):
-    async def _run():
+def decay(project: str) -> None:
+    async def _run() -> None:
         config = _get_config()
         pool = await _get_pool(config)
         pb_db.init_pool(pool)
@@ -167,8 +167,8 @@ def decay(project):
 @cli.command()
 @click.option("--project", "-p", required=True)
 @click.option("--task", "-t", default="")
-def briefing(project, task):
-    async def _run():
+def briefing(project: str, task: str) -> None:
+    async def _run() -> None:
         from .pb_engine import generate_briefing
         from .pb_llm import LLMClient
 
@@ -186,8 +186,8 @@ def briefing(project, task):
 
 @cli.command()
 @click.option("--project", "-p", required=True)
-def anchors(project):
-    async def _run():
+def anchors(project: str) -> None:
+    async def _run() -> None:
         from .pb_engine import generate_anchors
 
         config = _get_config()
@@ -202,7 +202,7 @@ def anchors(project):
     asyncio.run(_run())
 
 
-def main():
+def main() -> None:
     cli()
 
 

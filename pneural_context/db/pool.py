@@ -8,12 +8,12 @@ _pool: asyncpg.Pool | None = None
 _embedding_client: EmbeddingClient | None = None
 
 
-def init_pool(pool: asyncpg.Pool):
+def init_pool(pool: asyncpg.Pool) -> None:
     global _pool
     _pool = pool
 
 
-def init_embedding_client(client: EmbeddingClient | None):
+def init_embedding_client(client: EmbeddingClient | None) -> None:
     global _embedding_client
     _embedding_client = client
 

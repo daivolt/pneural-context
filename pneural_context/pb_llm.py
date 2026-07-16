@@ -37,7 +37,7 @@ class LLMClient:
             ) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
-                return data["choices"][0]["message"]["content"].strip()
+                return str(data["choices"][0]["message"]["content"].strip())
         except Exception:
             await self.close()
             raise
@@ -83,7 +83,7 @@ class LLMClient:
                 text = text.split("```json")[1].split("```")[0]
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0]
-            return json.loads(text.strip())
+            return dict(json.loads(text.strip()))
         except (json.JSONDecodeError, IndexError):
             return {
                 "insights": [result],
@@ -112,7 +112,7 @@ class LLMClient:
                 text = text.split("```json")[1].split("```")[0]
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0]
-            return json.loads(text.strip())
+            return dict(json.loads(text.strip()))
         except (json.JSONDecodeError, IndexError):
             return {
                 "task_pattern": task,
@@ -155,6 +155,6 @@ class LLMClient:
             result = result[:497] + "..."
         return result
 
-    async def close(self):
+    async def close(self) -> None:
         if self._session and not self._session.closed:
             await self._session.close()

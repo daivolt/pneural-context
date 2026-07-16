@@ -4,6 +4,8 @@ import logging
 import time
 from typing import Any
 
+import asyncpg
+
 from . import pb_db
 from .pb_llm import LLMClient
 
@@ -21,7 +23,9 @@ def _to_epoch(val: Any) -> float:
         return 0.0
 
 
-async def auto_classify(project: str, llm: LLMClient | None = None, pool=None) -> dict[str, Any]:
+async def auto_classify(
+    project: str, llm: LLMClient | None = None, pool: asyncpg.Pool | None = None
+) -> dict[str, Any]:
     entries = await pb_db.get_memory_entries_full(project, pool=pool)
     unclassified = [e for e in entries if e.get("memory_type") == "temporal"]
     if not unclassified:
@@ -46,7 +50,7 @@ async def auto_classify(project: str, llm: LLMClient | None = None, pool=None) -
 
 
 async def run_consolidation(
-    project: str, llm: LLMClient | None = None, pool=None
+    project: str, llm: LLMClient | None = None, pool: asyncpg.Pool | None = None
 ) -> dict[str, Any]:
     entries = await pb_db.get_memory_entries_full(project, pool=pool)
     if not entries:
@@ -161,7 +165,7 @@ async def generate_briefing(
     project: str,
     task_description: str = "",
     llm: LLMClient | None = None,
-    pool=None,
+    pool: asyncpg.Pool | None = None,
 ) -> dict[str, Any]:
     entries = await pb_db.get_memory_entries_full(project, pool=pool)
     red_ink = [e for e in entries if e.get("priority") == "critical"]
@@ -240,7 +244,7 @@ async def generate_briefing(
     }
 
 
-async def generate_anchors(project: str, pool=None) -> dict[str, Any]:
+async def generate_anchors(project: str, pool: asyncpg.Pool | None = None) -> dict[str, Any]:
     entries = await pb_db.get_memory_entries_full(project, pool=pool)
     red_ink = [e for e in entries if e.get("priority") == "critical"]
     procedures = await pb_db.list_procedures(project, retired=False, pool=pool)

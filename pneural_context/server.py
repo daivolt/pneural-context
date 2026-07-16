@@ -41,6 +41,18 @@ from .routers import (
 logger = logging.getLogger("pneural_context.server")
 
 
+async def _ensure_schema(pool: asyncpg.Pool) -> None:
+    async with pool.acquire() as conn:
+        extensions = await conn.fetch(
+            "SELECT extname FROM pg_extension WHERE extname IN ('pg_trgm', 'uuid-ossp', 'vector')"
+        )
+        existing = {r["extname"] for r in extensions}
+        for ext in ("pg_trgm", "uuid-ossp", "vector"):
+            if ext not in existing:
+                await conn.execute(f'CREATE EXTENSION IF NOT EXISTS "{ext}"')
+    logger.info("Database extensions ensured")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config: PBConfig = app.state.config
@@ -54,6 +66,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     pool = await asyncpg.create_pool(config.database_url, min_size=2, max_size=10)
     app.state.pool = pool
     pb_db.init_pool(pool)
+
+    await _ensure_schema(pool)
+
+    schema_path = Path(__file__).parent / "pb_schema.sql"
+    if schema_path.exists():
+        async with pool.acquire() as conn:
+            with open(schema_path) as f:
+                await conn.execute(f.read())
+        logger.info("Database schema applied")
 
     app.state.llm_client = LLMClient(
         url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key
@@ -69,13 +90,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.memoria = MemoriaBridge(config.memoria_url)
     else:
         app.state.memoria = None
-
-    schema_path = Path(__file__).parent / "pb_schema.sql"
-    if schema_path.exists():
-        async with pool.acquire() as conn:
-            with open(schema_path) as f:
-                await conn.execute(f.read())
-        logger.info("Database schema applied")
 
     if embedding_client:
         async with pool.acquire() as conn:
