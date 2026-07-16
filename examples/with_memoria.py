@@ -1,8 +1,10 @@
 import asyncio
-from pneural_context.pb_config import PBConfig
-from pneural_context.pb_db import init_pool, add_memory_entry, get_memory_entries
-from pneural_context.pb_memoria import MemoriaBridge
+
 import asyncpg
+
+from pneural_context.pb_config import PBConfig
+from pneural_context.pb_db import add_memory_entry, get_memory_entries, init_pool
+from pneural_context.pb_memoria import MemoriaBridge
 
 
 async def main():

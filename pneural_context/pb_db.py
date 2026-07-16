@@ -4,7 +4,6 @@ import json
 import logging
 import math
 import time
-from typing import Any
 
 import asyncpg
 
@@ -69,9 +68,7 @@ async def add_memory_entry(
     return entry_id
 
 
-async def get_memory_entries(
-    project: str, pool: asyncpg.Pool | None = None
-) -> list[dict]:
+async def get_memory_entries(project: str, pool: asyncpg.Pool | None = None) -> list[dict]:
     p = await _get_pool(pool)
     rows = await p.fetch(
         """SELECT id, project, entry, priority, memory_type, strength,
@@ -82,9 +79,7 @@ async def get_memory_entries(
     return [dict(r) for r in rows]
 
 
-async def get_memory_entries_full(
-    project: str, pool: asyncpg.Pool | None = None
-) -> list[dict]:
+async def get_memory_entries_full(project: str, pool: asyncpg.Pool | None = None) -> list[dict]:
     p = await _get_pool(pool)
     rows = await p.fetch(
         """SELECT id, project, entry, priority, memory_type, strength,
@@ -171,9 +166,7 @@ async def update_memory_type_by_id(
     return result.endswith("1")
 
 
-async def touch_memory_access(
-    project: str, index: int, pool: asyncpg.Pool | None = None
-) -> bool:
+async def touch_memory_access(project: str, index: int, pool: asyncpg.Pool | None = None) -> bool:
     p = await _get_pool(pool)
     result = await p.execute(
         """UPDATE pb_memory
@@ -201,9 +194,7 @@ async def touch_memory_by_ids(ids: list[int], pool: asyncpg.Pool | None = None) 
     return count
 
 
-async def boost_memory_entry(
-    project: str, idx: int, pool: asyncpg.Pool | None = None
-) -> dict:
+async def boost_memory_entry(project: str, idx: int, pool: asyncpg.Pool | None = None) -> dict:
     p = await _get_pool(pool)
     row = await p.fetchrow(
         """UPDATE pb_memory
@@ -225,9 +216,7 @@ async def replace_memory_entry(
     p = await _get_pool(pool)
     async with p.acquire() as conn:
         async with conn.transaction():
-            escaped_old = (
-                old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            )
+            escaped_old = old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             row = await conn.fetchrow(
                 "SELECT id, entry FROM pb_memory WHERE project = $1 AND entry ILIKE '%' || $2 || '%' ESCAPE '\\' LIMIT 1",
                 project,
@@ -243,9 +232,7 @@ async def replace_memory_entry(
             return True
 
 
-async def delete_memory_entry(
-    project: str, index: int, pool: asyncpg.Pool | None = None
-) -> bool:
+async def delete_memory_entry(project: str, index: int, pool: asyncpg.Pool | None = None) -> bool:
     p = await _get_pool(pool)
     result = await p.execute(
         "DELETE FROM pb_memory WHERE project = $1 AND id = $2",
@@ -364,11 +351,10 @@ async def search_procedures(
     p = await _get_pool(pool)
     threshold = similarity_threshold if similarity_threshold is not None else 0.1
     escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    async with p.acquire() as conn:
-        async with conn.transaction():
-            await conn.execute("SET LOCAL pg_trgm.similarity_threshold = $1", threshold)
-            rows = await conn.fetch(
-                """SELECT id, project, task_pattern, task_type, steps, success_count,
+    async with p.acquire() as conn, conn.transaction():
+        await conn.execute("SET LOCAL pg_trgm.similarity_threshold = $1", threshold)
+        rows = await conn.fetch(
+            """SELECT id, project, task_pattern, task_type, steps, success_count,
                           fail_count, reinforcement_score, proven_by, created_at, retired,
                           similarity(task_pattern, $2) as sim
                    FROM pb_procedural_memory
@@ -376,12 +362,12 @@ async def search_procedures(
                          AND (task_pattern % $2 OR task_pattern ILIKE '%' || $4 || '%' ESCAPE '\\')
                    ORDER BY similarity(task_pattern, $2) DESC
                    LIMIT $3""",
-                project,
-                query,
-                limit,
-                escaped,
-            )
-            return [{**dict(r), "_table": "pb_procedural_memory"} for r in rows]
+            project,
+            query,
+            limit,
+            escaped,
+        )
+        return [{**dict(r), "_table": "pb_procedural_memory"} for r in rows]
 
 
 async def update_procedure_outcome(
@@ -404,9 +390,7 @@ async def update_procedure_outcome(
             if success:
                 new_succ = cur_succ + 1
                 new_fail = cur_fail
-                accuracy = (
-                    new_succ / (new_succ + new_fail) if new_succ + new_fail > 0 else 0.5
-                )
+                accuracy = new_succ / (new_succ + new_fail) if new_succ + new_fail > 0 else 0.5
                 new_score = accuracy * math.log(new_succ + 1)
                 new_score = round(max(0.0, min(1.0, new_score)), 6)
                 if proven_by:
@@ -448,11 +432,7 @@ async def update_procedure_outcome(
                     new_score,
                     proc_id,
                 )
-            if (
-                row2
-                and row2["fail_count"] > row2["success_count"] * 2
-                and row2["fail_count"] > 5
-            ):
+            if row2 and row2["fail_count"] > row2["success_count"] * 2 and row2["fail_count"] > 5:
                 await conn.execute(
                     "UPDATE pb_procedural_memory SET retired = TRUE WHERE id = $1",
                     proc_id,
@@ -488,14 +468,10 @@ async def add_consolidated(
         raise ValueError(f"tier must be one of {valid_tiers}, got {tier!r}")
     valid_types = ("red", "concept", "procedural", "temporal", "relation")
     if memory_type not in valid_types:
-        raise ValueError(
-            f"memory_type must be one of {valid_types}, got {memory_type!r}"
-        )
+        raise ValueError(f"memory_type must be one of {valid_types}, got {memory_type!r}")
     valid_priorities = ("critical", "important", "normal")
     if priority not in valid_priorities:
-        raise ValueError(
-            f"priority must be one of {valid_priorities}, got {priority!r}"
-        )
+        raise ValueError(f"priority must be one of {valid_priorities}, got {priority!r}")
     p = await _get_pool(pool)
     row = await p.fetchrow(
         """INSERT INTO pb_consolidated_memory
@@ -523,9 +499,7 @@ async def add_consolidated(
                     consol_id,
                 )
         except Exception:
-            logger.warning(
-                "Failed to embed consolidated entry %d", consol_id, exc_info=True
-            )
+            logger.warning("Failed to embed consolidated entry %d", consol_id, exc_info=True)
     return consol_id
 
 
@@ -621,9 +595,7 @@ async def promote_consolidated(
     return result.endswith("1")
 
 
-async def touch_consolidated_by_ids(
-    ids: list[int], pool: asyncpg.Pool | None = None
-) -> int:
+async def touch_consolidated_by_ids(ids: list[int], pool: asyncpg.Pool | None = None) -> int:
     if not ids:
         return 0
     p = await _get_pool(pool)
@@ -648,9 +620,7 @@ async def apply_decay(
 ) -> dict:
     p = await _get_pool(pool)
     total = await p.fetchval("SELECT COUNT(*) FROM pb_memory")
-    red_ink = await p.fetchval(
-        "SELECT COUNT(*) FROM pb_memory WHERE priority = 'critical'"
-    )
+    red_ink = await p.fetchval("SELECT COUNT(*) FROM pb_memory WHERE priority = 'critical'")
     recent_cutoff = time.time() - recent_threshold_seconds
     await p.execute(
         """UPDATE pb_memory SET strength = strength * $1
@@ -694,9 +664,7 @@ async def apply_decay(
     }
 
 
-async def archive_decay(
-    threshold: float = 0.1, pool: asyncpg.Pool | None = None
-) -> dict:
+async def archive_decay(threshold: float = 0.1, pool: asyncpg.Pool | None = None) -> dict:
     p = await _get_pool(pool)
     async with p.acquire() as conn:
         async with conn.transaction():
@@ -751,9 +719,7 @@ async def archive_decay(
                     c_ids,
                 )
             remaining = await conn.fetchval("SELECT COUNT(*) FROM pb_memory")
-            c_remaining = await conn.fetchval(
-                "SELECT COUNT(*) FROM pb_consolidated_memory"
-            )
+            c_remaining = await conn.fetchval("SELECT COUNT(*) FROM pb_consolidated_memory")
             return {
                 "archived": len(rows),
                 "consolidated_archived": len(c_rows),
@@ -790,21 +756,20 @@ async def archive_memory_entry(entry_id: int, pool: asyncpg.Pool | None = None) 
     )
     if not row:
         return False
-    async with p.acquire() as conn:
-        async with conn.transaction():
-            await conn.execute(
-                """INSERT INTO pb_memory_archive
+    async with p.acquire() as conn, conn.transaction():
+        await conn.execute(
+            """INSERT INTO pb_memory_archive
                    (original_id, project, entry, priority, memory_type, strength, created_at)
                    VALUES ($1, $2, $3, $4, $5, $6, $7)""",
-                row["id"],
-                row["project"],
-                row["entry"],
-                row["priority"],
-                row["memory_type"],
-                row["strength"],
-                row["created_at"],
-            )
-            await conn.execute("DELETE FROM pb_memory WHERE id = $1", entry_id)
+            row["id"],
+            row["project"],
+            row["entry"],
+            row["priority"],
+            row["memory_type"],
+            row["strength"],
+            row["created_at"],
+        )
+        await conn.execute("DELETE FROM pb_memory WHERE id = $1", entry_id)
     return True
 
 
@@ -838,9 +803,7 @@ async def search_archived(
     return [dict(r) for r in rows]
 
 
-async def restore_archived(
-    archive_id: int, pool: asyncpg.Pool | None = None
-) -> dict | None:
+async def restore_archived(archive_id: int, pool: asyncpg.Pool | None = None) -> dict | None:
     p = await _get_pool(pool)
     row = await p.fetchrow(
         "SELECT id, original_id, project, entry, priority, memory_type, strength FROM pb_memory_archive WHERE id = $1",
@@ -860,9 +823,7 @@ async def restore_archived(
                 row["memory_type"],
                 min(row["strength"] + 0.2, 1.0),
             )
-            await conn.execute(
-                "DELETE FROM pb_memory_archive WHERE id = $1", archive_id
-            )
+            await conn.execute("DELETE FROM pb_memory_archive WHERE id = $1", archive_id)
     return {
         "id": new_row["id"],
         "project": row["project"],
@@ -946,9 +907,7 @@ async def get_memory_cost_summary(
 # ── Papers ─────────────────────────────────────────────────────
 
 
-async def search_papers(
-    q: str, limit: int = 5, pool: asyncpg.Pool | None = None
-) -> list[dict]:
+async def search_papers(q: str, limit: int = 5, pool: asyncpg.Pool | None = None) -> list[dict]:
     p = await _get_pool(pool)
     escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     rows = await p.fetch(
@@ -1119,9 +1078,7 @@ async def hybrid_search_consolidated(
         escaped,
         limit,
     )
-    trigram_results = [
-        {**dict(r), "_table": "pb_consolidated_memory"} for r in trigram_rows
-    ]
+    trigram_results = [{**dict(r), "_table": "pb_consolidated_memory"} for r in trigram_rows]
     if query_vec is None:
         return trigram_results
     vector_results = await vector_search_consolidated(project, query_vec, limit, pool)
@@ -1173,9 +1130,7 @@ async def reindex_table(
     if _embedding_client is None:
         raise RuntimeError("Embedding client not initialized")
     if table not in _ALLOWED_TABLES:
-        raise ValueError(
-            f"Invalid table: {table!r}. Must be one of {sorted(_ALLOWED_TABLES)}"
-        )
+        raise ValueError(f"Invalid table: {table!r}. Must be one of {sorted(_ALLOWED_TABLES)}")
     expected_col = _ALLOWED_TABLES[table]
     if text_column != expected_col:
         raise ValueError(
@@ -1237,9 +1192,7 @@ async def dedup_context_entries(
         sim = entry.get("similarity", 0.0) or 0.0
         if entry.get("priority") == "critical" and entry.get("strength", 1.0) >= 0.3:
             deduped.append(entry)
-        elif sim >= threshold_high:
-            continue
-        elif sim < threshold_low:
+        elif sim >= threshold_high or sim < threshold_low:
             continue
         else:
             deduped.append(entry)

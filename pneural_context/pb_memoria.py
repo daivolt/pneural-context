@@ -27,9 +27,7 @@ class MemoriaBridge:
             self._client = httpx.AsyncClient(timeout=30.0)
         return self._client
 
-    async def recall(
-        self, query: str, project: str = "", limit: int = 5
-    ) -> list[dict[str, Any]]:
+    async def recall(self, query: str, project: str = "", limit: int = 5) -> list[dict[str, Any]]:
         client = await self._ensure_client()
         params: dict[str, Any] = {"q": query, "limit": limit}
         if project:

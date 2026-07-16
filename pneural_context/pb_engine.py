@@ -21,9 +21,7 @@ def _to_epoch(val: Any) -> float:
         return 0.0
 
 
-async def auto_classify(
-    project: str, llm: LLMClient | None = None, pool=None
-) -> dict[str, Any]:
+async def auto_classify(project: str, llm: LLMClient | None = None, pool=None) -> dict[str, Any]:
     entries = await pb_db.get_memory_entries_full(project, pool=pool)
     unclassified = [e for e in entries if e.get("memory_type") == "temporal"]
     if not unclassified:
@@ -66,9 +64,7 @@ async def run_consolidation(
     important = [e for e in entries if e.get("priority") == "important"]
     normal = [e for e in entries if e.get("priority") == "normal"]
 
-    existing_immediate = await pb_db.get_consolidated_by_tier(
-        project, "immediate", pool=pool
-    )
+    existing_immediate = await pb_db.get_consolidated_by_tier(project, "immediate", pool=pool)
     if not existing_immediate:
         if critical:
             content = " | ".join(e["entry"][:200] for e in critical[:10])
@@ -123,9 +119,7 @@ async def run_consolidation(
 
     result["insights_created"] = total_insights
 
-    consolidated_entries = await pb_db.get_consolidated_for_injection(
-        project, pool=pool
-    )
+    consolidated_entries = await pb_db.get_consolidated_for_injection(project, pool=pool)
     for entry in consolidated_entries:
         if entry.get("priority") == "critical":
             ok = await pb_db.promote_consolidated(entry["id"], "timeless", pool=pool)
@@ -135,9 +129,7 @@ async def run_consolidation(
     for entry in consolidated_entries:
         strength = entry.get("strength", 0.5)
         source_count = len(entry.get("source_sessions", []) or [])
-        if (strength >= 0.8 or source_count >= 3) and entry.get(
-            "priority"
-        ) != "critical":
+        if (strength >= 0.8 or source_count >= 3) and entry.get("priority") != "critical":
             ok = await pb_db.promote_consolidated(entry["id"], "timeless", pool=pool)
             if ok:
                 result["consolidated_to_timeless"] += 1
@@ -224,9 +216,7 @@ async def generate_briefing(
 
     if llm and task_description:
         try:
-            briefing = await llm.generate_briefing(
-                context_text + f"\n\nTask: {task_description}"
-            )
+            briefing = await llm.generate_briefing(context_text + f"\n\nTask: {task_description}")
             return {
                 "project": project,
                 "task": task_description,
@@ -290,9 +280,7 @@ async def generate_anchors(project: str, pool=None) -> dict[str, Any]:
             }
             for e in recent
         ],
-        "red_ink_reminders": [
-            {"id": e["id"], "entry": e["entry"][:120]} for e in red_ink[:5]
-        ],
+        "red_ink_reminders": [{"id": e["id"], "entry": e["entry"][:120]} for e in red_ink[:5]],
         "top_procedures": [
             {
                 "id": p.get("id"),

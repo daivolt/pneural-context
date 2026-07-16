@@ -7,20 +7,20 @@ via PB_* environment variables. All features default to enabled.
 Transport: stdio (spawned by opencode as child process)
 """
 
+import json
 import os
 import sys
-import json
 import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 import aiohttp
+from help_texts import get_help
+
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
-
-from help_texts import get_help, HELPS
+from mcp.types import TextContent, Tool
 
 PNEURAL_URL = os.environ.get("PNEURAL_URL", "http://localhost:8777")
 
@@ -731,9 +731,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=fmt(result))]
 
         if name == "pb_get_full_memory":
-            result = await api_get(
-                "/api/memory/full", {"project": arguments["project"]}
-            )
+            result = await api_get("/api/memory/full", {"project": arguments["project"]})
             return [TextContent(type="text", text=fmt(result))]
 
         if name == "pb_replace_memory":
@@ -894,9 +892,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=fmt(result))]
 
         if name == "pb_decay_status":
-            result = await api_get(
-                "/api/decay/status", {"project": arguments["project"]}
-            )
+            result = await api_get("/api/decay/status", {"project": arguments["project"]})
             return [TextContent(type="text", text=fmt(result))]
 
         if name == "pb_search_archive":
@@ -957,9 +953,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 async def main():
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
+        await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
 if __name__ == "__main__":

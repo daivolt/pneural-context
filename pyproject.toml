@@ -41,7 +41,14 @@ embeddings = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
     "httpx>=0.27.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+]
+
+mcp = [
+    "mcp>=0.1.0",
 ]
 
 [project.scripts]
@@ -61,3 +68,23 @@ testpaths = ["tests"]
 markers = [
     "integration: integration tests requiring live server (deselected in CI)",
 ]
+addopts = "--cov=pneural_context --cov-fail-under=0 --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+fix = true
+
+[tool.ruff.lint]
+select = ["C4", "E", "F", "I001", "PERF", "W", "B", "UP", "N", "SIM"]
+ignore = ["E501", "SIM117", "SIM105", "PERF401"]
+
+[tool.mypy]
+python_version = "3.11"
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+[[tool.mypy.overrides]]
+module = ["asyncpg.*", "aiohttp.*", "mcp.*", "sentence_transformers.*"]
+ignore_missing_imports = true

@@ -11,9 +11,7 @@ logger = logging.getLogger("pneural_context.pb_embeddings")
 
 
 class EmbeddingClient:
-    def __init__(
-        self, backend: str, url: str, model: str, dimensions: int, batch_size: int
-    ):
+    def __init__(self, backend: str, url: str, model: str, dimensions: int, batch_size: int):
         self.backend = backend
         self.url = url.rstrip("/")
         self.model = model
@@ -33,18 +31,14 @@ class EmbeddingClient:
         try:
             return await self._get_client().embed(text)
         except Exception:
-            logger.warning(
-                "Embedding failed for text (%d chars)", len(text), exc_info=True
-            )
+            logger.warning("Embedding failed for text (%d chars)", len(text), exc_info=True)
             return None
 
     async def embed_batch(self, texts: list[str]) -> list[list[float] | None]:
         try:
             return await self._get_client().embed_batch(texts)
         except Exception:
-            logger.warning(
-                "Batch embedding failed (%d texts)", len(texts), exc_info=True
-            )
+            logger.warning("Batch embedding failed (%d texts)", len(texts), exc_info=True)
             return [None] * len(texts)
 
     async def close(self):
@@ -106,7 +100,7 @@ class PythonEmbeddingClient:
                 raise RuntimeError(
                     "sentence-transformers not installed. "
                     "Install with: pip install pneural-context[embeddings]"
-                )
+                ) from None
 
     async def embed(self, text: str) -> list[float]:
         self._load_model()
@@ -119,7 +113,6 @@ class PythonEmbeddingClient:
     async def embed_batch(self, texts: list[str]) -> list[list[float] | None]:
         self._load_model()
         import asyncio
-        import numpy as np
 
         loop = asyncio.get_running_loop()
         vectors = await loop.run_in_executor(None, self._model.encode, texts)
@@ -143,15 +136,11 @@ _CACHE_MAX_SIZE = 10000
 
 def _evict_cache():
     now = time.time()
-    expired = [
-        k for k, (_, ts) in _conversation_cache.items() if now - ts >= _CACHE_TTL
-    ]
+    expired = [k for k, (_, ts) in _conversation_cache.items() if now - ts >= _CACHE_TTL]
     for k in expired:
         del _conversation_cache[k]
     if len(_conversation_cache) > _CACHE_MAX_SIZE:
-        sorted_keys = sorted(
-            _conversation_cache.keys(), key=lambda k: _conversation_cache[k][1]
-        )
+        sorted_keys = sorted(_conversation_cache.keys(), key=lambda k: _conversation_cache[k][1])
         to_remove = len(_conversation_cache) - _CACHE_MAX_SIZE
         for k in sorted_keys[:to_remove]:
             del _conversation_cache[k]

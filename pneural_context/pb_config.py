@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -39,9 +39,7 @@ class PBConfig:
             memoria_url=os.environ.get("PNEURAL_MEMORIA_URL", ""),
             memoria_enabled=os.environ.get("PNEURAL_MEMORIA_ENABLED", "").lower()
             in ("1", "true", "yes"),
-            decay_interval_seconds=float(
-                os.environ.get("PNEURAL_DECAY_INTERVAL", "21600")
-            ),
+            decay_interval_seconds=float(os.environ.get("PNEURAL_DECAY_INTERVAL", "21600")),
             consolidation_interval_seconds=float(
                 os.environ.get("PNEURAL_CONSOLIDATION_INTERVAL", "21600")
             ),
@@ -51,12 +49,8 @@ class PBConfig:
             embed_model=os.environ.get("PNEURAL_EMBED_MODEL", "nomic-embed-text"),
             embed_dimensions=int(os.environ.get("PNEURAL_EMBED_DIMENSIONS", "768")),
             embed_batch_size=int(os.environ.get("PNEURAL_EMBED_BATCH_SIZE", "32")),
-            dedup_threshold_high=float(
-                os.environ.get("PNEURAL_DEDUP_THRESHOLD_HIGH", "0.85")
-            ),
-            dedup_threshold_low=float(
-                os.environ.get("PNEURAL_DEDUP_THRESHOLD_LOW", "0.55")
-            ),
+            dedup_threshold_high=float(os.environ.get("PNEURAL_DEDUP_THRESHOLD_HIGH", "0.85")),
+            dedup_threshold_low=float(os.environ.get("PNEURAL_DEDUP_THRESHOLD_LOW", "0.55")),
             dedup_conversation_messages=int(
                 os.environ.get("PNEURAL_DEDUP_CONVERSATION_MESSAGES", "10")
             ),

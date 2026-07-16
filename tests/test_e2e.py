@@ -126,9 +126,7 @@ class TestPhase2LLM:
             "E2E briefing fact: FastAPI supports async endpoints natively",
             "normal",
         )
-        r = client.get(
-            "/api/briefing", params={"project": PROJECT, "task": "testing briefing"}
-        )
+        r = client.get("/api/briefing", params={"project": PROJECT, "task": "testing briefing"})
         assert r.status_code == 200
         data = r.json()
         assert "markdown" in data or "sections" in data or "briefing" in data
@@ -153,18 +151,14 @@ class TestPhase2LLM:
         assert data.get("id")
 
     def test_08_auto_classify(self, client):
-        _add(
-            client, "E2E classify: this is a concept about database indexing", "normal"
-        )
+        _add(client, "E2E classify: this is a concept about database indexing", "normal")
         r = client.post("/api/memory/classify", json={"project": PROJECT})
         assert r.status_code == 200
         data = r.json()
         assert isinstance(data, dict)
 
     def test_09_add_memory_with_type(self, client):
-        r = _add(
-            client, "E2E red ink fact: never delete production data", "critical", "red"
-        )
+        r = _add(client, "E2E red ink fact: never delete production data", "critical", "red")
         assert r.get("id")
         assert r["priority"] == "critical"
 
@@ -198,10 +192,7 @@ class TestPhase3RAG:
         full = client.get("/api/memory/full", params={"project": PROJECT}).json()
         entry = next((e for e in full if e.get("id") == entry_id), None)
         assert entry is not None
-        assert (
-            entry.get("embedding") is not None
-            or entry.get("has_embedding") is not False
-        )
+        assert entry.get("embedding") is not None or entry.get("has_embedding") is not False
 
     def test_12_vector_search(self, client):
         _add(
@@ -320,7 +311,7 @@ class TestPhase5Decay:
         r = client.get("/api/decay/status", params={"project": PROJECT})
         assert r.status_code == 200
         data = r.json()
-        assert isinstance(data, (list, dict))
+        assert isinstance(data, list | dict)
 
     def test_21_archive_decay_and_search(self, client):
         r = client.post("/api/decay/archive", params={"threshold": 0.01})

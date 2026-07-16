@@ -328,9 +328,7 @@ MODULE_ORDER = [
 ]
 
 
-def get_help(
-    module: str = "", fmt: str = "markdown", features: dict | None = None
-) -> str:
+def get_help(module: str = "", fmt: str = "markdown", features: dict | None = None) -> str:
     module = module.lower().strip()
     if module not in HELPS:
         module = ""

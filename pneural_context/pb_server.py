@@ -9,7 +9,6 @@ import asyncio
 import json
 import logging
 import os
-import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,8 +16,7 @@ from pathlib import Path
 import asyncpg
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 
 from . import pb_db
 from .pb_config import PBConfig
@@ -39,9 +37,7 @@ from .pb_memoria import MemoriaBridge
 logger = logging.getLogger("pneural_context.pb_server")
 
 CONFIG_PATH = Path(
-    os.environ.get(
-        "PNEURAL_CONFIG_FILE", str(Path.home() / ".pneural-context" / "config.json")
-    )
+    os.environ.get("PNEURAL_CONFIG_FILE", str(Path.home() / ".pneural-context" / "config.json"))
 )
 
 config: PBConfig = PBConfig.from_env()
@@ -105,9 +101,7 @@ async def lifespan(app: FastAPI):
     _pool = await asyncpg.create_pool(config.database_url, min_size=2, max_size=10)
     pb_db.init_pool(_pool)
 
-    llm_client = LLMClient(
-        url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key
-    )
+    llm_client = LLMClient(url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key)
 
     embedding_client = create_embedding_client(config)
     if embedding_client:
@@ -145,9 +139,7 @@ async def lifespan(app: FastAPI):
         task = asyncio.create_task(_decay_loop(config.decay_interval_seconds))
         _background_tasks.append(task)
     if config.consolidation_interval_seconds > 0:
-        task = asyncio.create_task(
-            _consolidation_loop(config.consolidation_interval_seconds)
-        )
+        task = asyncio.create_task(_consolidation_loop(config.consolidation_interval_seconds))
         _background_tasks.append(task)
 
     logger.info(f"pneural-context server started on {config.host}:{config.port}")
@@ -222,9 +214,7 @@ async def add_memory(request: Request):
     memory_type = body.get("memory_type")
     if not project or not text:
         raise HTTPException(400, "project and text required")
-    entry_id = await pb_db.add_memory_entry(
-        project, text, priority, memory_type, pool=_pool
-    )
+    entry_id = await pb_db.add_memory_entry(project, text, priority, memory_type, pool=_pool)
     return {"id": entry_id, "project": project, "text": text, "priority": priority}
 
 
@@ -338,15 +328,11 @@ async def classify_memory(request: Request):
 
 @app.get("/api/context")
 async def get_context(project: str, semantic_query: str | None = None):
-    threshold = (
-        config.archive_threshold if config.archive_threshold is not None else 0.1
-    )
+    threshold = config.archive_threshold if config.archive_threshold is not None else 0.1
     entries = await pb_db.get_memory_entries_full(project, pool=_pool)
     filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
     red_ink = [
-        e
-        for e in filtered
-        if e.get("priority") == "critical" and e.get("strength", 1.0) >= 0.3
+        e for e in filtered if e.get("priority") == "critical" and e.get("strength", 1.0) >= 0.3
     ]
     by_type: dict[str, list[dict]] = {}
     for e in filtered:
@@ -357,9 +343,7 @@ async def get_context(project: str, semantic_query: str | None = None):
 
     consolidated_rows = []
     try:
-        consolidated_rows = await pb_db.get_consolidated_for_injection(
-            project, pool=_pool
-        )
+        consolidated_rows = await pb_db.get_consolidated_for_injection(project, pool=_pool)
     except Exception:
         pass
 
@@ -423,8 +407,7 @@ async def get_context(project: str, semantic_query: str | None = None):
         group = [
             e
             for e in filtered
-            if e.get("memory_type", "temporal") == mtype
-            and e.get("priority") != "critical"
+            if e.get("memory_type", "temporal") == mtype and e.get("priority") != "critical"
         ]
         if group:
             typed_sections[mtype] = [e["entry"] for e in group]
@@ -476,9 +459,7 @@ async def recall(
                             }
                         )
                         if boost:
-                            await pb_db.touch_memory_access(
-                                project, e.get("id", 0), pool=_pool
-                            )
+                            await pb_db.touch_memory_access(project, e.get("id", 0), pool=_pool)
             except Exception:
                 logger.warning("Semantic recall failed, falling back to text search")
         if not results:
@@ -495,9 +476,7 @@ async def recall(
                         }
                     )
                     if boost:
-                        await pb_db.touch_memory_access(
-                            project, e.get("id", 0), pool=_pool
-                        )
+                        await pb_db.touch_memory_access(project, e.get("id", 0), pool=_pool)
         results = results[:limit]
     if memoria and (not source or source == "sessions"):
         try:
@@ -532,9 +511,7 @@ async def list_procedures(project: str, retired: bool = False):
 
 
 @app.get("/api/procedures/search")
-async def search_procedures(
-    project: str, query: str, limit: int = 5, semantic: bool = False
-):
+async def search_procedures(project: str, query: str, limit: int = 5, semantic: bool = False):
     if semantic and embedding_client:
         try:
             query_vec = await embedding_client.embed(query)
@@ -553,9 +530,7 @@ async def procedure_outcome(proc_id: int, request: Request):
     body = await request.json()
     success = body.get("success", True)
     proven_by = body.get("proven_by", "")
-    result = await pb_db.update_procedure_outcome(
-        proc_id, success, proven_by, pool=_pool
-    )
+    result = await pb_db.update_procedure_outcome(proc_id, success, proven_by, pool=_pool)
     if not result:
         raise HTTPException(404, "Procedure not found")
     return result
@@ -689,9 +664,7 @@ async def record_session(request: Request):
             logger.warning("Session summarization failed, storing raw title")
     if not summary:
         summary = title or f"Session {session_id[:8] if session_id else 'unknown'}"
-    entry_id = await pb_db.add_memory_entry(
-        project, summary, "normal", memory_type, pool=_pool
-    )
+    entry_id = await pb_db.add_memory_entry(project, summary, "normal", memory_type, pool=_pool)
     return {
         "id": entry_id,
         "project": project,
@@ -764,23 +737,17 @@ async def get_smart_context(request: Request):
     if not project:
         raise HTTPException(400, "project required")
     if not conversation or not embedding_client:
-        threshold = (
-            config.archive_threshold if config.archive_threshold is not None else 0.1
-        )
+        threshold = config.archive_threshold if config.archive_threshold is not None else 0.1
         entries = await pb_db.get_memory_entries_full(project, pool=_pool)
         filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
         return {"project": project, "source": "full", "entries": filtered}
     try:
-        conv_vec = await get_conversation_embedding(
-            project, conversation, embedding_client
-        )
+        conv_vec = await get_conversation_embedding(project, conversation, embedding_client)
     except Exception:
         logger.warning("Conversation embedding failed, falling back to full context")
         conv_vec = None
     if conv_vec is None:
-        threshold = (
-            config.archive_threshold if config.archive_threshold is not None else 0.1
-        )
+        threshold = config.archive_threshold if config.archive_threshold is not None else 0.1
         entries = await pb_db.get_memory_entries_full(project, pool=_pool)
         filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
         return {"project": project, "source": "full_fallback", "entries": filtered}
@@ -806,14 +773,8 @@ async def get_smart_context(request: Request):
 @app.get("/api/config")
 async def get_config():
     stored = _load_config_file()
-    safe_stored = {
-        k: v for k, v in stored.items() if k not in ("llm_api_key", "database_url")
-    }
-    current = {
-        k: v
-        for k, v in config.__dict__.items()
-        if k not in ("llm_api_key", "database_url")
-    }
+    safe_stored = {k: v for k, v in stored.items() if k not in ("llm_api_key", "database_url")}
+    current = {k: v for k, v in config.__dict__.items() if k not in ("llm_api_key", "database_url")}
     current["stored_config"] = safe_stored
     current["llm_api_key_set"] = bool(config.llm_api_key)
     current["database_url_set"] = bool(config.database_url)
@@ -852,9 +813,7 @@ async def update_config(request: Request):
         if not isinstance(v, expected):
             type_names = expected if isinstance(expected, tuple) else (expected,)
             names = "/".join(t.__name__ for t in type_names)
-            raise HTTPException(
-                400, f"Field '{k}' must be {names}, got {type(v).__name__}"
-            )
+            raise HTTPException(400, f"Field '{k}' must be {names}, got {type(v).__name__}")
         updates[k] = (
             float(v)
             if isinstance(expected, tuple) and int in expected and isinstance(v, int)

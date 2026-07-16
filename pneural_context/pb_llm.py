@@ -65,8 +65,7 @@ class LLMClient:
 
     async def consolidate(self, entries: list[dict]) -> dict[str, Any]:
         entries_text = "\n".join(
-            f"- [{e.get('memory_type', 'temporal')}] {e.get('entry', '')}"
-            for e in entries[:20]
+            f"- [{e.get('memory_type', 'temporal')}] {e.get('entry', '')}" for e in entries[:20]
         )
         prompt = (
             "Analyze these memory entries and extract key insights, "
@@ -151,9 +150,7 @@ class LLMClient:
             f"Messages:\n{conversation}\n\n"
             "Caveman summary:"
         )
-        result = await self._chat(
-            [{"role": "user", "content": prompt}], temperature=0.2
-        )
+        result = await self._chat([{"role": "user", "content": prompt}], temperature=0.2)
         if len(result) > 500:
             result = result[:497] + "..."
         return result

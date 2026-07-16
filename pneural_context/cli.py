@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 
-import click
 import asyncpg
+import click
 
-from .pb_config import PBConfig
 from . import pb_db
+from .pb_config import PBConfig
 
 
 def _get_config() -> PBConfig:
@@ -67,9 +66,7 @@ def memory_add(project, text, priority, memory_type):
         config = _get_config()
         pool = await _get_pool(config)
         pb_db.init_pool(pool)
-        entry_id = await pb_db.add_memory_entry(
-            project, text, priority, memory_type, pool=pool
-        )
+        entry_id = await pb_db.add_memory_entry(project, text, priority, memory_type, pool=pool)
         click.echo(f"Added memory entry id={entry_id}")
         await pool.close()
 
