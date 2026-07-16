@@ -4,7 +4,8 @@ import logging
 
 import asyncpg
 
-from .pool import _embedding_client, _get_pool
+from . import pool as pool_mod
+from .pool import _get_pool
 
 logger = logging.getLogger("pneural_context.db.memory")
 
@@ -28,9 +29,9 @@ async def add_memory_entry(
         mt,
     )
     entry_id: int = row["id"]
-    if _embedding_client:
+    if pool_mod._embedding_client:
         try:
-            vec = await _embedding_client.embed(text)
+            vec = await pool_mod._embedding_client.embed(text)
             if vec:
                 await p.execute(
                     "UPDATE pb_memory SET embedding = $1 WHERE id = $2",

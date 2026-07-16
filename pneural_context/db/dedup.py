@@ -30,10 +30,10 @@ async def dedup_context_entries(
     for r in rows:
         entry = dict(r)
         sim = entry.get("similarity", 0.0) or 0.0
-        if entry.get("priority") == "critical" and entry.get("strength", 1.0) >= 0.3:
-            deduped.append(entry)
-        elif sim >= threshold_high or sim < threshold_low:
-            continue
-        else:
+        if (
+            entry.get("priority") == "critical"
+            and entry.get("strength", 1.0) >= 0.3
+            or threshold_low <= sim < threshold_high
+        ):
             deduped.append(entry)
     return deduped

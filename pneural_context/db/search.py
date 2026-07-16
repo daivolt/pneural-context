@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncpg
 
+from . import pool as pool_mod
 from .papers import search_papers
-from .pool import _embedding_client, _get_pool
+from .pool import _get_pool
 from .procedures import search_procedures
 
 
@@ -207,7 +208,7 @@ async def reindex_table(
     pool: asyncpg.Pool | None = None,
 ) -> int:
     p = await _get_pool(pool)
-    if _embedding_client is None:
+    if pool_mod._embedding_client is None:
         raise RuntimeError("Embedding client not initialized")
     if table not in _ALLOWED_TABLES:
         raise ValueError(f"Invalid table: {table!r}. Must be one of {sorted(_ALLOWED_TABLES)}")
@@ -232,7 +233,7 @@ async def reindex_table(
             break
         col = expected_col
         texts = [r[col] for r in rows]
-        vectors = await _embedding_client.embed_batch(texts)
+        vectors = await pool_mod._embedding_client.embed_batch(texts)
         update_sql = f"UPDATE {table} SET embedding = $1 WHERE id = $2"
         for i, row in enumerate(rows):
             vec = vectors[i] if i < len(vectors) else None

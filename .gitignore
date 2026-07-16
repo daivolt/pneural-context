@@ -25,3 +25,6 @@ docs/references/*.pdf
 .coverage
 
 .gitleaks.toml
+
+# PoC test reports
+tests/poc/reports/*.json
