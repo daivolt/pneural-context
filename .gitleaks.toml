@@ -1,0 +1,56 @@
+title = "pneural-context secret scanning"
+
+[[rules]]
+id = "pneural-production-db-password"
+description = "Production DB password (pneural_ctx_2026)"
+regex = '''pneural_ctx_2026'''
+tags = ["database", "password", "critical"]
+
+[[rules]]
+id = "internal-ip-address"
+description = "Private IP address (10.x, 192.168.x)"
+regex = '''(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+)'''
+tags = ["network", "internal"]
+
+[[rules]]
+id = "tailscale-ip"
+description = "Tailscale IP address"
+regex = '''100\.(6[4-9]|[7-9]\d|1[0-2]\d)\.\d+\.\d+'''
+tags = ["network", "tailscale"]
+
+[[rules]]
+id = "cloudflare-api-key"
+description = "Cloudflare Global API Key"
+regex = '''cfk_[a-zA-Z0-9]{20,}'''
+tags = ["cloudflare", "api-key"]
+
+[[rules]]
+id = "cloudflare-api-token"
+description = "Cloudflare API Token"
+regex = '''cfut_[a-zA-Z0-9]{20,}'''
+tags = ["cloudflare", "api-token"]
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key ID"
+regex = '''AKIA[A-Z0-9]{16}'''
+tags = ["aws", "access-key"]
+
+[[rules]]
+id = "ssh-password"
+description = "Hardcoded SSH/system password"
+regex = '''(password|passwd|pwd)\s*[=:]\s*["'][^"']{8,}["']'''
+tags = ["password", "credentials"]
+
+[allowlist]
+description = "Dev/test passwords and example files are acceptable"
+regexes = [
+  '''pneural_dev''',
+  '''pneural_test''',
+]
+paths = [
+  '''\.env\.example$''',
+  '''^\.github/workflows/.*$''',
+  '''^examples/docker-compose\.yml$''',
+  '''^README\.md$''',
+]
