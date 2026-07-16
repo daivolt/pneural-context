@@ -3,6 +3,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- pb_memory: per-project memory entries
 CREATE TABLE IF NOT EXISTS pb_memory (
@@ -36,6 +37,9 @@ ALTER TABLE pb_memory DROP CONSTRAINT IF EXISTS chk_pb_memory_type;
 ALTER TABLE pb_memory ADD CONSTRAINT chk_pb_memory_type
     CHECK (memory_type IN ('red', 'concept', 'procedural', 'temporal', 'relation'));
 
+ALTER TABLE pb_memory ADD COLUMN IF NOT EXISTS embedding vector(768);
+CREATE INDEX IF NOT EXISTS idx_pb_memory_embedding ON pb_memory USING hnsw (embedding vector_cosine_ops);
+
 -- pb_procedural_memory: basal ganglia procedural memory
 CREATE TABLE IF NOT EXISTS pb_procedural_memory (
     id SERIAL PRIMARY KEY,
@@ -65,6 +69,9 @@ ALTER TABLE pb_procedural_memory ADD CONSTRAINT chk_pb_proc_score_range
 ALTER TABLE pb_procedural_memory DROP CONSTRAINT IF EXISTS chk_pb_proc_counts_nonneg;
 ALTER TABLE pb_procedural_memory ADD CONSTRAINT chk_pb_proc_counts_nonneg
     CHECK (success_count >= 0 AND fail_count >= 0);
+
+ALTER TABLE pb_procedural_memory ADD COLUMN IF NOT EXISTS embedding vector(768);
+CREATE INDEX IF NOT EXISTS idx_pb_proc_embedding ON pb_procedural_memory USING hnsw (embedding vector_cosine_ops);
 
 -- pb_consolidated_memory: 3-tier cortex consolidation
 CREATE TABLE IF NOT EXISTS pb_consolidated_memory (
@@ -99,6 +106,9 @@ ALTER TABLE pb_consolidated_memory ADD CONSTRAINT chk_pb_consol_memory_type
 ALTER TABLE pb_consolidated_memory DROP CONSTRAINT IF EXISTS chk_pb_consol_tier;
 ALTER TABLE pb_consolidated_memory ADD CONSTRAINT chk_pb_consol_tier
     CHECK (tier IN ('immediate', 'consolidated', 'timeless'));
+
+ALTER TABLE pb_consolidated_memory ADD COLUMN IF NOT EXISTS embedding vector(768);
+CREATE INDEX IF NOT EXISTS idx_pb_consol_embedding ON pb_consolidated_memory USING hnsw (embedding vector_cosine_ops);
 
 -- pb_memory_archive: forgotten but searchable
 CREATE TABLE IF NOT EXISTS pb_memory_archive (
@@ -151,3 +161,6 @@ CREATE INDEX IF NOT EXISTS idx_pb_papers_filename ON pb_papers(filename);
 CREATE INDEX IF NOT EXISTS idx_pb_papers_folder ON pb_papers(folder);
 CREATE INDEX IF NOT EXISTS idx_pb_papers_text_trgm ON pb_papers USING gin (text gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_pb_papers_enriched_trgm ON pb_papers USING gin (enriched_text gin_trgm_ops);
+
+ALTER TABLE pb_papers ADD COLUMN IF NOT EXISTS embedding vector(768);
+CREATE INDEX IF NOT EXISTS idx_pb_papers_embedding ON pb_papers USING hnsw (embedding vector_cosine_ops);

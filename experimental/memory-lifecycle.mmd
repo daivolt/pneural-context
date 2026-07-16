@@ -1,0 +1,29 @@
+flowchart TB
+    Add["ADD MEMORY<br/>POST /api/memory<br/>{project, text, priority, type}"]
+
+    Add --> Embed["Ollama generates<br/>768-dim embedding"]
+    Embed --> Store["Store in pb_memory<br/>(entry + embedding + trigram index)"]
+
+    Store --> Access["Memory accessed<br/>(context injection, recall)"]
+    Access --> Boost["Boost strength +0.3<br/>(spaced repetition)"]
+
+    Store --> DecayClock["Time passes...<br/>strength decays via half-life formula"]
+
+    DecayClock --> DecayRun{"Decay run<br/>POST /api/decay"}
+
+    DecayRun -->|"strength > 0.3"| Stable["Stable — remains<br/>in pb_memory"]
+    DecayRun -->|"strength < 0.3<br/>but > 0.1"| Fading["Fading — still<br/>injected, lower priority"]
+    DecayRun -->|"strength < 0.1<br/>(non-critical)"| Archive["Archive<br/>POST /api/decay/archive"]
+
+    Archive --> Archived["Moved to pb_memory_archive<br/> Forgotten but still searchable"]
+
+    Critical{"priority=critical?"}
+    Add --> Critical
+    Critical -->|"Yes"| RedInk["Red Ink — NEVER decays<br/>below 0.5 strength<br/>ALWAYS injected"]
+    Critical -->|"No"| Normal["Normal — subject<br/>to decay lifecycle"]
+
+    style Add fill:#0f3460,stroke:#533483,color:#fff
+    style RedInk fill:#e94560,stroke:#e94560,color:#fff
+    style Archive fill:#333,stroke:#666,color:#999
+    style Archived fill:#222,stroke:#555,color:#888
+    style Boost fill:#1a6b3c,stroke:#2ecc71,color:#fff

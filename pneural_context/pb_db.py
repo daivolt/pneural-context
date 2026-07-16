@@ -8,14 +8,22 @@ from typing import Any
 
 import asyncpg
 
+from .pb_embeddings import EmbeddingClient
+
 logger = logging.getLogger("pneural_context.pb_db")
 
 _pool: asyncpg.Pool | None = None
+_embedding_client: EmbeddingClient | None = None
 
 
 def init_pool(pool: asyncpg.Pool):
     global _pool
     _pool = pool
+
+
+def init_embedding_client(client: EmbeddingClient | None):
+    global _embedding_client
+    _embedding_client = client
 
 
 async def _get_pool(pool: asyncpg.Pool | None = None) -> asyncpg.Pool:
@@ -46,7 +54,19 @@ async def add_memory_entry(
         priority,
         mt,
     )
-    return row["id"]
+    entry_id = row["id"]
+    if _embedding_client:
+        try:
+            vec = await _embedding_client.embed(text)
+            if vec:
+                await p.execute(
+                    "UPDATE pb_memory SET embedding = $1 WHERE id = $2",
+                    str(vec),
+                    entry_id,
+                )
+        except Exception:
+            logger.warning("Failed to embed memory entry %d", entry_id, exc_info=True)
+    return entry_id
 
 
 async def get_memory_entries(
@@ -275,7 +295,7 @@ async def search_memory(
         escaped,
         limit,
     )
-    return [dict(r) for r in rows]
+    return [{**dict(r), "_table": "pb_memory"} for r in rows]
 
 
 # ── Procedural Memory ──────────────────────────────────────────
@@ -301,7 +321,20 @@ async def add_procedure(
         json.dumps(steps),
         proven,
     )
-    return row["id"]
+    proc_id = row["id"]
+    if _embedding_client:
+        try:
+            embed_text = f"{task_pattern} {' '.join(steps)}"
+            vec = await _embedding_client.embed(embed_text)
+            if vec:
+                await p.execute(
+                    "UPDATE pb_procedural_memory SET embedding = $1 WHERE id = $2",
+                    str(vec),
+                    proc_id,
+                )
+        except Exception:
+            logger.warning("Failed to embed procedure %d", proc_id, exc_info=True)
+    return proc_id
 
 
 async def list_procedures(
@@ -348,7 +381,7 @@ async def search_procedures(
                 limit,
                 escaped,
             )
-            return [dict(r) for r in rows]
+            return [{**dict(r), "_table": "pb_procedural_memory"} for r in rows]
 
 
 async def update_procedure_outcome(
@@ -479,7 +512,21 @@ async def add_consolidated(
         priority,
         strength,
     )
-    return row["id"]
+    consol_id = row["id"]
+    if _embedding_client:
+        try:
+            vec = await _embedding_client.embed(content)
+            if vec:
+                await p.execute(
+                    "UPDATE pb_consolidated_memory SET embedding = $1 WHERE id = $2",
+                    str(vec),
+                    consol_id,
+                )
+        except Exception:
+            logger.warning(
+                "Failed to embed consolidated entry %d", consol_id, exc_info=True
+            )
+    return consol_id
 
 
 async def add_consolidated_entry(
@@ -910,12 +957,293 @@ async def search_papers(
            FROM pb_papers
            WHERE title ILIKE '%' || $1 || '%' ESCAPE '\\'
               OR text ILIKE '%' || $1 || '%' ESCAPE '\\'
-              OR enriched_text ILIKE '%' || $1 || '%' ESCAPE '\\'
-           ORDER BY id DESC LIMIT $2""",
+               OR enriched_text ILIKE '%' || $1 || '%' ESCAPE '\\'
+            ORDER BY id DESC LIMIT $2""",
         escaped,
         limit,
     )
-    return [dict(r) for r in rows]
+    return [{**dict(r), "_table": "pb_papers"} for r in rows]
+
+
+# ── Vector Search ─────────────────────────────────────────────────
+
+
+async def vector_search_memory(
+    project: str,
+    query_vec: list[float],
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    vec_str = str(query_vec)
+    rows = await p.fetch(
+        """SELECT id, project, entry, priority, memory_type, strength,
+                  1 - (embedding <=> $2::vector) AS similarity
+           FROM pb_memory
+           WHERE project = $1 AND embedding IS NOT NULL
+           ORDER BY embedding <=> $2::vector
+           LIMIT $3""",
+        project,
+        vec_str,
+        limit,
+    )
+    return [{**dict(r), "_table": "pb_memory"} for r in rows]
+
+
+async def vector_search_consolidated(
+    project: str,
+    query_vec: list[float],
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    vec_str = str(query_vec)
+    rows = await p.fetch(
+        """SELECT id, project, tier, content, memory_type, priority, strength,
+                  1 - (embedding <=> $2::vector) AS similarity
+           FROM pb_consolidated_memory
+           WHERE project = $1 AND embedding IS NOT NULL
+           ORDER BY embedding <=> $2::vector
+           LIMIT $3""",
+        project,
+        vec_str,
+        limit,
+    )
+    return [{**dict(r), "_table": "pb_consolidated_memory"} for r in rows]
+
+
+async def vector_search_procedures(
+    project: str,
+    query_vec: list[float],
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    vec_str = str(query_vec)
+    rows = await p.fetch(
+        """SELECT id, project, task_pattern, task_type, steps, reinforcement_score,
+                  1 - (embedding <=> $2::vector) AS similarity
+           FROM pb_procedural_memory
+           WHERE project = $1 AND embedding IS NOT NULL AND NOT retired
+           ORDER BY embedding <=> $2::vector
+           LIMIT $3""",
+        project,
+        vec_str,
+        limit,
+    )
+    return [{**dict(r), "_table": "pb_procedural_memory"} for r in rows]
+
+
+async def vector_search_papers(
+    query_vec: list[float],
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    vec_str = str(query_vec)
+    rows = await p.fetch(
+        """SELECT id, filename, folder, title,
+                  LEFT(text, 500) as snippet,
+                  1 - (embedding <=> $1::vector) AS similarity
+           FROM pb_papers
+           WHERE embedding IS NOT NULL
+           ORDER BY embedding <=> $1::vector
+           LIMIT $2""",
+        vec_str,
+        limit,
+    )
+    return [{**dict(r), "_table": "pb_papers"} for r in rows]
+
+
+def _rrf_merge(*result_sets: list[dict], k: int = 60) -> list[dict]:
+    scores: dict[str, float] = {}
+    entries: dict[str, dict] = {}
+    for results in result_sets:
+        for rank, row in enumerate(results):
+            rid = row.get("id")
+            table = row.get("_table", "unknown")
+            if rid is None:
+                continue
+            key = f"{table}:{rid}"
+            scores[key] = scores.get(key, 0.0) + 1.0 / (k + rank + 1)
+            entries[key] = row
+    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [{**entries[key], "rrf_score": score} for key, score in ranked]
+
+
+async def hybrid_search_memory(
+    project: str,
+    query: str,
+    query_vec: list[float] | None = None,
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    trigram_rows = await p.fetch(
+        """SELECT id, project, entry, priority, memory_type, strength,
+                  similarity(entry, $2) AS rank
+           FROM pb_memory
+           WHERE project = $1 AND (entry % $2 OR entry ILIKE '%' || $3 || '%' ESCAPE '\\')
+           ORDER BY rank DESC LIMIT $4""",
+        project,
+        query,
+        escaped,
+        limit,
+    )
+    trigram_results = [{**dict(r), "_table": "pb_memory"} for r in trigram_rows]
+    if query_vec is None:
+        return trigram_results
+    vector_results = await vector_search_memory(project, query_vec, limit, pool)
+    return _rrf_merge(trigram_results, vector_results)[:limit]
+
+
+async def hybrid_search_consolidated(
+    project: str,
+    query: str,
+    query_vec: list[float] | None = None,
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    trigram_rows = await p.fetch(
+        """SELECT id, project, tier, content, memory_type, priority, strength,
+                  similarity(content, $2) AS rank
+           FROM pb_consolidated_memory
+           WHERE project = $1
+             AND (content % $2 OR content ILIKE '%' || $3 || '%' ESCAPE '\\')
+           ORDER BY rank DESC LIMIT $4""",
+        project,
+        query,
+        escaped,
+        limit,
+    )
+    trigram_results = [
+        {**dict(r), "_table": "pb_consolidated_memory"} for r in trigram_rows
+    ]
+    if query_vec is None:
+        return trigram_results
+    vector_results = await vector_search_consolidated(project, query_vec, limit, pool)
+    return _rrf_merge(trigram_results, vector_results)[:limit]
+
+
+async def hybrid_search_procedures(
+    project: str,
+    query: str,
+    query_vec: list[float] | None = None,
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    trigram_results = await search_procedures(project, query, limit, pool=pool)
+    if query_vec is None:
+        return trigram_results
+    vector_results = await vector_search_procedures(project, query_vec, limit, pool)
+    return _rrf_merge(trigram_results, vector_results)[:limit]
+
+
+async def hybrid_search_papers(
+    query: str,
+    query_vec: list[float] | None = None,
+    limit: int = 10,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    trigram_results = await search_papers(query, limit, pool)
+    if query_vec is None:
+        return trigram_results
+    vector_results = await vector_search_papers(query_vec, limit, pool)
+    return _rrf_merge(trigram_results, vector_results)[:limit]
+
+
+_ALLOWED_TABLES = {
+    "pb_memory": "entry",
+    "pb_consolidated_memory": "content",
+    "pb_procedural_memory": "task_pattern",
+    "pb_papers": "text",
+}
+
+
+async def reindex_table(
+    table: str,
+    text_column: str,
+    batch_size: int = 32,
+    pool: asyncpg.Pool | None = None,
+) -> int:
+    p = await _get_pool(pool)
+    if _embedding_client is None:
+        raise RuntimeError("Embedding client not initialized")
+    if table not in _ALLOWED_TABLES:
+        raise ValueError(
+            f"Invalid table: {table!r}. Must be one of {sorted(_ALLOWED_TABLES)}"
+        )
+    expected_col = _ALLOWED_TABLES[table]
+    if text_column != expected_col:
+        raise ValueError(
+            f"Invalid column {text_column!r} for table {table!r}. Expected {expected_col!r}"
+        )
+    count = 0
+    while True:
+        rows = await p.fetch(
+            "SELECT id, entry FROM pb_memory WHERE embedding IS NULL ORDER BY id LIMIT $1"
+            if table == "pb_memory"
+            else "SELECT id, content FROM pb_consolidated_memory WHERE embedding IS NULL ORDER BY id LIMIT $1"
+            if table == "pb_consolidated_memory"
+            else "SELECT id, task_pattern FROM pb_procedural_memory WHERE embedding IS NULL ORDER BY id LIMIT $1"
+            if table == "pb_procedural_memory"
+            else "SELECT id, text FROM pb_papers WHERE embedding IS NULL ORDER BY id LIMIT $1",
+            batch_size,
+        )
+        if not rows:
+            break
+        col = expected_col
+        texts = [r[col] for r in rows]
+        vectors = await _embedding_client.embed_batch(texts)
+        update_sql = f"UPDATE {table} SET embedding = $1 WHERE id = $2"
+        for i, row in enumerate(rows):
+            vec = vectors[i] if i < len(vectors) else None
+            if vec:
+                await p.execute(update_sql, str(vec), row["id"])
+                count += 1
+    return count
+
+
+# ── Semantic Dedup ──────────────────────────────────────────────
+
+
+async def dedup_context_entries(
+    project: str,
+    conversation_vec: list[float],
+    threshold_high: float = 0.85,
+    threshold_low: float = 0.55,
+    limit: int = 200,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    p = await _get_pool(pool)
+    vec_str = str(conversation_vec)
+    rows = await p.fetch(
+        """SELECT id, project, entry, priority, memory_type, strength,
+                  1 - (embedding <=> $2::vector) AS similarity
+           FROM pb_memory
+           WHERE project = $1 AND embedding IS NOT NULL
+           ORDER BY embedding <=> $2::vector
+           LIMIT $3""",
+        project,
+        vec_str,
+        limit,
+    )
+    deduped: list[dict] = []
+    for r in rows:
+        entry = dict(r)
+        sim = entry.get("similarity", 0.0) or 0.0
+        if entry.get("priority") == "critical" and entry.get("strength", 1.0) >= 0.3:
+            deduped.append(entry)
+        elif sim >= threshold_high:
+            continue
+        elif sim < threshold_low:
+            continue
+        else:
+            deduped.append(entry)
+    return deduped
 
 
 # ── Utility ────────────────────────────────────────────────────

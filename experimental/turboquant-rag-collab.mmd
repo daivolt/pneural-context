@@ -1,0 +1,45 @@
+flowchart LR
+    subgraph Problem["The Problem"]
+        Direction["Which module<br/>does what?"]
+    end
+
+    subgraph Search["RAG Layer (Ollama + pgvector)"]
+        Embed["nomic-embed-text<br/>turns text → 768-dim vector"]
+        VecSearch["pgvector cosine search<br/>finds similar memories"]
+        TriSearch["pg_trgm fuzzy search<br/>finds partial text matches"]
+        Fuse["RRF fusion<br/>merges both rankings"]
+    end
+
+    subgraph Reasoning["Reasoning Layer (TurboQuant/Qwen)"]
+        Summarize["Summarize sessions<br/>into memory entries"]
+        Classify["Classify memory types<br/>(red/concept/procedural/...)"]
+        Consolidate["Consolidate memories<br/>into higher tiers"]
+        Brief["Generate briefing cards<br/>for task context"]
+    end
+
+    Direction --> Q1{"Need to FIND<br/>relevant memories?"}
+    Q1 -->|"Yes"| Embed
+    Embed --> VecSearch
+    Embed --> TriSearch
+    VecSearch --> Fuse
+    TriSearch --> Fuse
+
+    Direction --> Q2{"Need to UNDERSTAND<br/>or compress?"}
+    Q2 -->|"Yes"| Summarize
+    Q2 -->|"Yes"| Classify
+    Q2 -->|"Yes"| Consolidate
+    Q2 -->|"Yes"| Brief
+
+    Fuse --> Result["Ranked relevant memories"]
+    Summarize --> Result2["Compressed insights"]
+    Classify --> Result2
+    Consolidate --> Result2
+    Brief --> Result2
+
+    Result --> Inject["Injected into<br/>LLM context window"]
+    Result2 --> Inject
+
+    style Search fill:#0f3460,stroke:#533483,color:#fff
+    style Reasoning fill:#533483,stroke:#e94560,color:#fff
+    style Problem fill:#1a1a2e,stroke:#e94560,color:#fff
+    style Inject fill:#1a6b3c,stroke:#2ecc71,color:#fff

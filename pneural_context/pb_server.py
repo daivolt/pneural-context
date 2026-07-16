@@ -22,6 +22,11 @@ from fastapi.staticfiles import StaticFiles
 
 from . import pb_db
 from .pb_config import PBConfig
+from .pb_embeddings import (
+    EmbeddingClient,
+    create_embedding_client,
+    get_conversation_embedding,
+)
 from .pb_engine import (
     auto_classify,
     generate_anchors,
@@ -42,6 +47,7 @@ CONFIG_PATH = Path(
 config: PBConfig = PBConfig.from_env()
 llm_client: LLMClient | None = None
 memoria: MemoriaBridge | None = None
+embedding_client: EmbeddingClient | None = None
 _pool: asyncpg.Pool | None = None
 _background_tasks: list[asyncio.Task] = []
 
@@ -63,7 +69,7 @@ def _save_config_file(data: dict):
 
 
 def _apply_config_update(updates: dict):
-    global config, llm_client, memoria
+    global config, llm_client, memoria, embedding_client
     for k, v in updates.items():
         if k == "llm_api_key" or k == "database_url":
             continue
@@ -73,6 +79,9 @@ def _apply_config_update(updates: dict):
         llm_client = LLMClient(
             url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key
         )
+    if any(k.startswith("embed_") for k in updates):
+        embedding_client = create_embedding_client(config)
+        pb_db.init_embedding_client(embedding_client)
     if any(k.startswith("memoria_") for k in updates):
         if config.memoria_enabled and config.memoria_url:
             memoria = MemoriaBridge(config.memoria_url)
@@ -82,7 +91,7 @@ def _apply_config_update(updates: dict):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _pool, llm_client, memoria, config
+    global _pool, llm_client, memoria, config, embedding_client
     config = PBConfig.from_env()
     config_path = os.environ.get("PNEURAL_CONFIG_FILE")
     if config_path and Path(config_path).exists():
@@ -100,6 +109,11 @@ async def lifespan(app: FastAPI):
         url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key
     )
 
+    embedding_client = create_embedding_client(config)
+    if embedding_client:
+        pb_db.init_embedding_client(embedding_client)
+        logger.info("Embedding client initialized (backend=%s)", config.embed_backend)
+
     if config.memoria_enabled and config.memoria_url:
         memoria = MemoriaBridge(config.memoria_url)
 
@@ -109,6 +123,23 @@ async def lifespan(app: FastAPI):
             with open(schema_path) as f:
                 await conn.execute(f.read())
         logger.info("Database schema applied")
+
+    if embedding_client:
+        async with _pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT a.atttypmod FROM pg_attribute a "
+                "JOIN pg_class c ON a.attrelid = c.oid "
+                "JOIN pg_type t ON a.atttypid = t.oid "
+                "WHERE c.relname = 'pb_memory' AND a.attname = 'embedding' AND t.typname = 'vector'"
+            )
+            if row:
+                db_dims = row["atttypmod"]
+                if db_dims != config.embed_dimensions:
+                    raise RuntimeError(
+                        f"Embedding dimension mismatch: config={config.embed_dimensions}, "
+                        f"DB schema={db_dims}. Change PNEURAL_EMBED_DIMENSIONS or recreate schema."
+                    )
+        logger.info("Embedding dimension validated (%d)", config.embed_dimensions)
 
     if config.decay_interval_seconds > 0:
         task = asyncio.create_task(_decay_loop(config.decay_interval_seconds))
@@ -126,6 +157,8 @@ async def lifespan(app: FastAPI):
         task.cancel()
     if llm_client:
         await llm_client.close()
+    if embedding_client:
+        await embedding_client.close()
     if _pool:
         await _pool.close()
     if memoria:
@@ -304,7 +337,7 @@ async def classify_memory(request: Request):
 
 
 @app.get("/api/context")
-async def get_context(project: str):
+async def get_context(project: str, semantic_query: str | None = None):
     threshold = (
         config.archive_threshold if config.archive_threshold is not None else 0.1
     )
@@ -421,23 +454,50 @@ async def recall(
     limit: int = 5,
     source: str | None = None,
     boost: bool = True,
+    semantic: bool = False,
 ):
     results = []
     if project:
-        entries = await pb_db.get_memory_entries_full(project, pool=_pool)
-        for e in entries:
-            if q.lower() in e.get("entry", "").lower():
-                results.append(
-                    {
-                        "type": "memory",
-                        "project": project,
-                        "text": e["entry"],
-                        "score": 1.0,
-                        "id": e.get("id"),
-                    }
-                )
-                if boost:
-                    await pb_db.touch_memory_access(project, e.get("id", 0), pool=_pool)
+        if semantic and embedding_client:
+            try:
+                query_vec = await embedding_client.embed(q)
+                if query_vec:
+                    hybrid_results = await pb_db.hybrid_search_memory(
+                        project, q, query_vec, limit, pool=_pool
+                    )
+                    for e in hybrid_results:
+                        results.append(
+                            {
+                                "type": "memory",
+                                "project": project,
+                                "text": e.get("entry", ""),
+                                "score": e.get("rrf_score", e.get("rank", 0)),
+                                "id": e.get("id"),
+                            }
+                        )
+                        if boost:
+                            await pb_db.touch_memory_access(
+                                project, e.get("id", 0), pool=_pool
+                            )
+            except Exception:
+                logger.warning("Semantic recall failed, falling back to text search")
+        if not results:
+            entries = await pb_db.get_memory_entries_full(project, pool=_pool)
+            for e in entries:
+                if q.lower() in e.get("entry", "").lower():
+                    results.append(
+                        {
+                            "type": "memory",
+                            "project": project,
+                            "text": e["entry"],
+                            "score": 1.0,
+                            "id": e.get("id"),
+                        }
+                    )
+                    if boost:
+                        await pb_db.touch_memory_access(
+                            project, e.get("id", 0), pool=_pool
+                        )
         results = results[:limit]
     if memoria and (not source or source == "sessions"):
         try:
@@ -472,7 +532,18 @@ async def list_procedures(project: str, retired: bool = False):
 
 
 @app.get("/api/procedures/search")
-async def search_procedures(project: str, query: str, limit: int = 5):
+async def search_procedures(
+    project: str, query: str, limit: int = 5, semantic: bool = False
+):
+    if semantic and embedding_client:
+        try:
+            query_vec = await embedding_client.embed(query)
+            if query_vec:
+                return await pb_db.hybrid_search_procedures(
+                    project, query, query_vec, limit, pool=_pool
+                )
+        except Exception:
+            logger.warning("Semantic procedure search failed, falling back to text")
     procs = await pb_db.search_procedures(project, query, limit=limit, pool=_pool)
     return procs
 
@@ -650,6 +721,85 @@ async def search_papers(q: str, limit: int = 5):
     return await pb_db.search_papers(q, limit=limit, pool=_pool)
 
 
+# ── Reindex (Embedding Backfill) ─────────────────────────────────
+
+
+@app.post("/api/reindex")
+async def reindex(request: Request):
+    body = await request.json()
+    table = body.get("table", "all")
+    valid_tables = {"memory", "consolidated", "procedures", "papers", "all"}
+    if table not in valid_tables:
+        raise HTTPException(400, f"table must be one of {valid_tables}")
+    if not embedding_client:
+        raise HTTPException(503, "Embedding client not configured")
+    results = {}
+    table_map = {
+        "memory": ("pb_memory", "entry"),
+        "consolidated": ("pb_consolidated_memory", "content"),
+        "procedures": ("pb_procedural_memory", "task_pattern"),
+        "papers": ("pb_papers", "text"),
+    }
+    tables_to_reindex = list(table_map.keys()) if table == "all" else [table]
+    for t in tables_to_reindex:
+        db_table, text_col = table_map[t]
+        try:
+            count = await pb_db.reindex_table(
+                db_table, text_col, config.embed_batch_size, pool=_pool
+            )
+            results[t] = {"reindexed": count}
+        except Exception as e:
+            results[t] = {"error": str(e)}
+    return {"ok": True, "results": results}
+
+
+# ── Semantic Context (Smart Dedup) ──────────────────────────────
+
+
+@app.post("/api/context/smart")
+async def get_smart_context(request: Request):
+    body = await request.json()
+    project = body.get("project", "")
+    conversation = body.get("conversation", "")
+    if not project:
+        raise HTTPException(400, "project required")
+    if not conversation or not embedding_client:
+        threshold = (
+            config.archive_threshold if config.archive_threshold is not None else 0.1
+        )
+        entries = await pb_db.get_memory_entries_full(project, pool=_pool)
+        filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
+        return {"project": project, "source": "full", "entries": filtered}
+    try:
+        conv_vec = await get_conversation_embedding(
+            project, conversation, embedding_client
+        )
+    except Exception:
+        logger.warning("Conversation embedding failed, falling back to full context")
+        conv_vec = None
+    if conv_vec is None:
+        threshold = (
+            config.archive_threshold if config.archive_threshold is not None else 0.1
+        )
+        entries = await pb_db.get_memory_entries_full(project, pool=_pool)
+        filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
+        return {"project": project, "source": "full_fallback", "entries": filtered}
+    deduped = await pb_db.dedup_context_entries(
+        project,
+        conv_vec,
+        config.dedup_threshold_high,
+        config.dedup_threshold_low,
+        pool=_pool,
+    )
+    return {
+        "project": project,
+        "source": "smart_dedup",
+        "dedup_threshold_high": config.dedup_threshold_high,
+        "dedup_threshold_low": config.dedup_threshold_low,
+        "entries": deduped,
+    }
+
+
 # ── Config ─────────────────────────────────────────────────────
 
 
@@ -680,6 +830,14 @@ _CONFIG_TYPES = {
     "decay_interval_seconds": (int, float),
     "consolidation_interval_seconds": (int, float),
     "archive_threshold": (int, float),
+    "embed_backend": str,
+    "embed_url": str,
+    "embed_model": str,
+    "embed_dimensions": int,
+    "embed_batch_size": int,
+    "dedup_threshold_high": (int, float),
+    "dedup_threshold_low": (int, float),
+    "dedup_conversation_messages": int,
 }
 
 
