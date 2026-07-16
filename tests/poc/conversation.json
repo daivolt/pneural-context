@@ -1,0 +1,12 @@
+[
+  "I want to build a task management API with FastAPI and asyncpg. Help me design the architecture.",
+  "Create the Pydantic models for Task and User with proper type hints.",
+  "Write the database connection layer using asyncpg connection pooling.",
+  "Add CRUD endpoints for tasks with proper HTTP status codes.",
+  "Add error handling — validate all inputs, return 422 for bad data.",
+  "Write pytest tests for the CRUD endpoints using httpx async client.",
+  "Add API key authentication middleware for protected endpoints.",
+  "Refactor to use the repository pattern — separate data access from routes.",
+  "Add pagination to the list endpoint with limit and offset query parameters.",
+  "Write a docker-compose.yml for local development with PostgreSQL."
+]

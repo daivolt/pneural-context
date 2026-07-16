@@ -76,7 +76,7 @@ async def search_procedures(
     threshold = similarity_threshold if similarity_threshold is not None else 0.1
     escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     async with p.acquire() as conn, conn.transaction():
-        await conn.execute("SET LOCAL pg_trgm.similarity_threshold = $1", threshold)
+        await conn.execute(f"SET LOCAL pg_trgm.similarity_threshold = {float(threshold)}")
         rows = await conn.fetch(
             """SELECT id, project, task_pattern, task_type, steps, success_count,
                           fail_count, reinforcement_score, proven_by, created_at, retired,

@@ -1,0 +1,42 @@
+[
+  {
+    "text": "Never hardcode database credentials — always use environment variables with os.environ.get() and fail fast if missing",
+    "priority": "critical",
+    "memory_type": "red"
+  },
+  {
+    "text": "Always validate input with Pydantic models before any database operations — reject invalid data with 422 status",
+    "priority": "critical",
+    "memory_type": "red"
+  },
+  {
+    "text": "This project uses FastAPI with asyncpg for PostgreSQL access — use connection pooling with min_size=2, max_size=10",
+    "priority": "important",
+    "memory_type": "concept"
+  },
+  {
+    "text": "The project follows Bloomberg engineering standards: full type hints, fail-fast on missing env vars, generic error messages in production, detailed errors only in dev",
+    "priority": "important",
+    "memory_type": "concept"
+  },
+  {
+    "text": "To add a new endpoint: 1) Create Pydantic request/response models in models/, 2) Write the router in routers/, 3) Register in server.py with app.include_router(), 4) Add tests in tests/ using httpx.AsyncClient",
+    "priority": "normal",
+    "memory_type": "procedural"
+  },
+  {
+    "text": "Tests use pytest with httpx.AsyncClient and pytest-asyncio. Run with: pytest tests/ -v -m 'not integration'. Coverage gate at 70%.",
+    "priority": "normal",
+    "memory_type": "procedural"
+  },
+  {
+    "text": "Previous session: user designed a task management API with CRUD endpoints and asked for pagination with limit/offset",
+    "priority": "normal",
+    "memory_type": "temporal"
+  },
+  {
+    "text": "Task model has a many-to-one relationship with User model via foreign key user_id — tasks belong to users",
+    "priority": "normal",
+    "memory_type": "relation"
+  }
+]
