@@ -1,0 +1,46 @@
+sequenceDiagram
+    participant User
+    participant OC as opencode
+    participant Plugin as pneural-context plugin
+    participant Server as pneural-context (8778)
+    participant DB as PostgreSQL
+
+    Note over User,DB: Phase 1 — New Chat Session
+
+    User->>OC: Start new chat
+    OC->>Plugin: experimental.chat.system.transform
+    Plugin->>Server: GET /api/context?project=X
+    Server->>DB: SELECT memories WHERE project=X AND strength>=0.3
+    DB-->>Server: memory entries
+    Server-->>Plugin: markdown + PNEURAL_CTX marker
+    Plugin->>OC: Inject context into system prompt
+    OC->>User: Chat starts with memory context
+
+    Note over User,DB: Phase 2 — Smart Dedup (with conversation)
+
+    User->>OC: Send message
+    OC->>Plugin: experimental.chat.system.transform
+    Plugin->>OC: Collect last N messages
+    Plugin->>Server: POST /api/context/smart {project, conversation}
+    Server->>Server: Ollama embeds conversation
+    Server->>DB: pgvector cosine search + trigram search
+    Server->>Server: Three-zone filtering (skip/keep/always)
+    Server-->>Plugin: deduplicated entries
+    Plugin->>OC: Inject only relevant context
+
+    Note over User,DB: Phase 3 — Session Recording
+
+    OC->>Plugin: event: session.idle
+    Plugin->>OC: Collect session messages
+    Plugin->>Server: POST /api/session/record
+    Server->>Server: TurboQuant summarizes session
+    Server->>DB: INSERT summarized memory
+    Server-->>Plugin: {id, summary, stored: true}
+
+    Note over User,DB: Phase 4 — Compaction Preservation
+
+    OC->>Plugin: experimental.session.compacting
+    Plugin->>Server: GET /api/context?project=X
+    Server-->>Plugin: PNEURAL_CTX marker
+    Plugin->>OC: "Preserve PNEURAL_CTX marker verbatim"
+    Note over OC: Summary keeps pinned context, drops old messages

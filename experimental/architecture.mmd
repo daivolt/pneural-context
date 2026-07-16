@@ -1,0 +1,36 @@
+graph TB
+    subgraph Client["Client Layer"]
+        OC["opencode (CLI/TUI)"]
+        Plugin["pneural-context plugin (index.mjs)"]
+    end
+
+    subgraph Server["pneural-context Server (port 8778)"]
+        API["FastAPI REST API"]
+        Engine["pb_engine.py (core logic)"]
+        DB["pb_db.py (PostgreSQL + pgvector)"]
+        LLM["pb_llm.py (LLM client)"]
+        EMB["pb_embeddings.py (Ollama)"]
+    end
+
+    subgraph Storage["Storage Layer"]
+        PG["PostgreSQL 16 + pgvector + pg_trgm"]
+    end
+
+    subgraph LLM_Layer["LLM Layer"]
+        Ollama["Ollama (nomic-embed-text) port 11434"]
+        TurboQuant["TurboQuant/llama.cpp (Qwen 2.5 Coder 7B) port 8080"]
+    end
+
+    OC -->|"chat events"| Plugin
+    Plugin -->|"GET /api/context"| API
+    Plugin -->|"POST /api/context/smart"| API
+    Plugin -->|"POST /api/session/record"| API
+
+    API --> Engine
+    Engine --> DB
+    Engine --> LLM
+    Engine --> EMB
+
+    DB --> PG
+    EMB -->|"embed text"| Ollama
+    LLM -->|"summarize/classify"| TurboQuant

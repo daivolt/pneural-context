@@ -1,0 +1,24 @@
+flowchart LR
+    Query["User Query"] --> Embed["Ollama embed<br/>(nomic-embed-text)"]
+    Query --> Trigram["pg_trgm search<br/>(SQL LIKE + similarity)"]
+
+    Embed --> VecSearch["pgvector cosine search<br/>(HNSW index)"]
+    VecSearch --> RRF["RRF Score Fusion<br/>1/(k+rank_vec) + 1/(k+rank_trgm)"]
+    Trigram --> RRF
+
+    RRF --> Filter{"Similarity > 0.55?"}
+    Filter -->|"No: Irrelevant"| Skip["Skip"]
+    Filter -->|"Yes"| Results["Ranked Results"]
+
+    Results --> Dedup{"Smart Dedup<br/>(if conversation)"}
+    Dedup -->|"Similarity > 0.85"| Already["Already in conversation<br/>— Skip"]
+    Dedup -->|"0.55–0.85"| Inject["Inject into context"]
+    Dedup -->|"Red Ink (critical)"| Always["Always inject"]
+
+    style Embed fill:#533483,stroke:#e94560,color:#fff
+    style VecSearch fill:#0f3460,stroke:#533483,color:#fff
+    style Trigram fill:#16213e,stroke:#0f3460,color:#fff
+    style RRF fill:#1a1a2e,stroke:#e94560,color:#fff
+    style Always fill:#e94560,stroke:#e94560,color:#fff
+    style Skip fill:#333,color:#888
+    style Already fill:#333,color:#888

@@ -1,0 +1,18 @@
+flowchart TB
+    Input["New Memory Added"]
+
+    Input --> Immediate["IMMEDIATE TIER<br/><br/>Raw episodic memory<br/>Short-lived, decays fast<br/>Half-life: hours to days<br/><br/>e.g. 'User asked about<br/>Docker deployment at 3pm'"]
+
+    Immediate --> Consolidate{"Consolidation run<br/>POST /api/consolidation"}
+
+    Consolidate -->|"TurboQuant<br/>analyzes patterns"| Pattern["Pattern extraction<br/>by LLM"]
+
+    Pattern --> Consolidated["CONSOLIDATED TIER<br/><br/>Extracted concepts<br/>Medium stability<br/>Half-life: weeks to months<br/><br/>e.g. 'Docker compose v2<br/>is used for deployment'"]
+
+    Consolidated -->|"Repeated reinforcement<br/>+ high strength"| TimelessCheck{"Multiple<br/>reinforcements?"}
+    TimelessCheck -->|"Yes"| Timeless["TIMELESS TIER<br/><br/>Core knowledge<br/>Never decays below 0.5<br/>Always injected<br/><br/>e.g. 'Always use env vars<br/>for secrets'"]
+
+    style Immediate fill:#16213e,stroke:#0f3460,color:#fff
+    style Consolidated fill:#0f3460,stroke:#533483,color:#fff
+    style Timeless fill:#533483,stroke:#e94560,color:#fff
+    style TimelessCheck fill:#1a1a2e,stroke:#533483,color:#fff
