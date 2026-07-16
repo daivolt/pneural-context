@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -15,7 +15,7 @@ PNEURAL_URL = "http://localhost:8779"
 CONVERSATION_FILE = Path(__file__).parent / "conversation.json"
 LOGS_DIR = Path(__file__).parent / "logs"
 CONVERSATION_DIR = Path(__file__).parent / "conversation"
-OPENCODE_DB_PATH_WIN = r"C:\Users\daivolt\AppData\Local\opencode\opencode.db"
+OPENCODE_DB_PATH = Path(r"C:\Users\daivolt\.local\share\opencode\opencode.db")
 
 
 def load_conversation() -> list[str]:
@@ -85,6 +85,7 @@ class ConversationRunner:
             return {"status": "error", "code": r.status_code, "text": r.text[:500]}
 
         deadline = time.monotonic() + poll_timeout
+        last_msg_count = 0
         while time.monotonic() < deadline:
             time.sleep(poll_interval)
             msgs_r = self.client.get(f"/session/{self.session_id}/message")
@@ -93,19 +94,74 @@ class ConversationRunner:
             msgs = msgs_r.json()
             if not isinstance(msgs, list) or len(msgs) < 2:
                 continue
+
+            if len(msgs) <= last_msg_count:
+                continue
+            last_msg_count = len(msgs)
+
             last = msgs[-1]
-            parts = last.get("parts", [])
-            texts = [p.get("text", "") for p in parts if p.get("type") == "text"]
-            combined = " ".join(texts).strip()
-            if combined:
-                info = last.get("info", {})
+            data_str = str(last.get("data", ""))
+            if '"role":"assistant"' not in data_str and '"role": "assistant"' not in data_str:
+                continue
+
+            all_parts = []
+            for m in msgs:
+                d = m.get("data", "")
+                if isinstance(d, str) and '"role":"assistant"' in d or '"role": "assistant"' in d:
+                    try:
+                        parsed = json.loads(d)
+                        if parsed.get("role") == "assistant":
+                            pass
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+            combined_text = ""
+            parts_r = self.client.get(f"/session/{self.session_id}/part")
+            if parts_r.status_code == 200:
+                all_parts = parts_r.json()
+                if isinstance(all_parts, list):
+                    for p in all_parts:
+                        pd = p.get("data", "")
+                        if isinstance(pd, str):
+                            try:
+                                parsed = json.loads(pd)
+                                if parsed.get("type") == "text" and parsed.get("text"):
+                                    combined_text += parsed["text"] + "\n"
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+            else:
+                for m in msgs:
+                    d = m.get("data", "")
+                    if isinstance(d, str):
+                        try:
+                            parsed = json.loads(d)
+                            if parsed.get("role") == "assistant":
+                                tokens = parsed.get("tokens", {})
+                                return {
+                                    "status": "ok",
+                                    "text": combined_text.strip() or "[response captured in DB]",
+                                    "parts": [],
+                                    "role": "assistant",
+                                    "tokens": tokens,
+                                    "message_id": m.get("id", ""),
+                                }
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+            if combined_text.strip():
+                last_msg = msgs[-1]
+                try:
+                    msg_data = json.loads(last_msg.get("data", "{}"))
+                    tokens = msg_data.get("tokens", {})
+                except (json.JSONDecodeError, TypeError):
+                    tokens = {}
                 return {
                     "status": "ok",
-                    "text": combined,
-                    "parts": parts,
-                    "role": info.get("role", ""),
-                    "tokens": info.get("tokens", {}),
-                    "message_id": last.get("id", ""),
+                    "text": combined_text.strip(),
+                    "parts": [],
+                    "role": "assistant",
+                    "tokens": tokens,
+                    "message_id": last_msg.get("id", ""),
                 }
 
         return {"status": "timeout", "text": "", "tokens": {}}
@@ -145,73 +201,24 @@ class ConversationRunner:
 
 
 def copy_opencode_db(arm: str) -> Path:
+    """Copy the opencode DB locally (benchmark runs on the same machine as opencode)."""
     dest = LOGS_DIR / f"{arm}_opencode.db"
-    import subprocess
-
-    result = subprocess.run(
-        [
-            "sshpass",
-            "-p",
-            "icaro9$d",
-            "scp",
-            "-o",
-            "StrictHostKeyChecking=no",
-            f"daivolt@10.42.0.89:{OPENCODE_DB_PATH_WIN.replace(chr(92), '/')}",
-            str(dest),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if result.returncode != 0:
-        print(f"  [WARN] Failed to copy opencode DB: {result.stderr[:200]}")
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    src = OPENCODE_DB_PATH
+    if not src.exists():
+        print(f"  [WARN] opencode DB not found at {src}")
+        return dest
+    shutil.copy2(str(src), str(dest))
+    print(f"  Copied opencode DB for {arm} ({dest.stat().st_size} bytes)")
     return dest
 
 
 def query_opencode_db(db_path: Path, session_id: str) -> dict:
     if not db_path.exists():
         return {"error": f"DB not found at {db_path}"}
-    results: dict[str, Any] = {}
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    try:
-        rows = conn.execute(
-            "SELECT id, type, seq, time_created FROM session_message WHERE session_id = ? ORDER BY seq",
-            (session_id,),
-        ).fetchall()
-        results["messages"] = [dict(r) for r in rows]
+    from db_inspector import inspect_opencode_db
 
-        compaction_rows = conn.execute(
-            "SELECT id, type, seq, data FROM session_message WHERE session_id = ? AND type = 'compaction' ORDER BY seq",
-            (session_id,),
-        ).fetchall()
-        results["compaction_messages"] = [dict(r) for r in compaction_rows]
-        for cm in results["compaction_messages"]:
-            if cm.get("data"):
-                try:
-                    cm["data_parsed"] = json.loads(cm["data"])
-                except (json.JSONDecodeError, TypeError):
-                    pass
-
-        system_rows = conn.execute(
-            "SELECT id, type, seq, data FROM session_message WHERE session_id = ? AND type = 'system' ORDER BY seq",
-            (session_id,),
-        ).fetchall()
-        results["system_messages"] = [dict(r) for r in system_rows]
-
-        has_ctx = False
-        for row in results.get("compaction_messages", []):
-            data_str = str(row.get("data", "")) + str(row.get("data_parsed", ""))
-            if "PNEURAL_CTX" in data_str:
-                has_ctx = True
-        for row in results.get("system_messages", []):
-            data_str = str(row.get("data", ""))
-            if "PNEURAL_CTX" in data_str:
-                has_ctx = True
-        results["pneural_ctx_found_in_db"] = has_ctx
-    finally:
-        conn.close()
-    return results
+    return inspect_opencode_db(db_path, session_id)
 
 
 if __name__ == "__main__":
