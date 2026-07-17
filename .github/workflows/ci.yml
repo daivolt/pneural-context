@@ -95,7 +95,7 @@ jobs:
         env:
           PNEURAL_DATABASE_URL: postgresql://pneural:pneural_test@localhost:5432/pneural_test
         run: |
-          pytest tests/ -v -m "not integration" --ignore=tests/poc --cov=pneural_context --cov-report=term-missing --cov-report=xml
+          pytest tests/ -v --tb=long -m "not integration" --ignore=tests/poc --cov=pneural_context --cov-report=term-missing --cov-report=xml 2>&1 | head -100
 
       - name: Upload coverage
         if: matrix.python-version == '3.12'
