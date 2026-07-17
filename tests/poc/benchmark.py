@@ -98,9 +98,9 @@ def copy_opencode_db(suffix: str = "treatment") -> Path:
 def run_conversation(project: str = PROJECT) -> dict[str, Any]:
     from conversation_runner import ConversationRunner
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running treatment arm conversation")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     prompts = json.loads(CONVERSATION_FILE.read_text())
     runner = ConversationRunner(arm="treatment", project=project)
@@ -126,9 +126,9 @@ def run_conversation(project: str = PROJECT) -> dict[str, Any]:
 
 
 def run_api_exercises() -> dict[str, Any]:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running API exercises (36 endpoints)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from api_exercises import APIExercises
 
@@ -142,9 +142,9 @@ def run_api_exercises() -> dict[str, Any]:
 
 
 def run_mcp_exercises() -> dict[str, Any]:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running MCP tool exercises (29 tools)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from mcp_exercise import MCPExercise
 
@@ -157,9 +157,9 @@ def run_mcp_exercises() -> dict[str, Any]:
 
 
 def run_faithfulness(treatment_dir: Path) -> dict[str, Any]:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running faithfulness analysis")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     treat_responses = []
     for i in range(1, 11):
@@ -178,9 +178,9 @@ def run_faithfulness(treatment_dir: Path) -> dict[str, Any]:
 
 
 def run_db_inspection(db_path: Path, session_id: str | None) -> dict[str, Any]:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running DB inspection")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from db_inspector import inspect_opencode_db
 
@@ -208,9 +208,9 @@ def run_db_inspection(db_path: Path, session_id: str | None) -> dict[str, Any]:
 
 
 def run_code_quality(treatment_dir: Path) -> dict[str, Any]:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running code quality analysis")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from code_quality import analyze_response
 
@@ -242,9 +242,9 @@ def run_llm_judge(treatment_dir: Path) -> dict[str, Any]:
         print("  [SKIP] DEEPSEEK_API_KEY not set, skipping LLM judge")
         return {"error": "DEEPSEEK_API_KEY not set", "per_turn": [], "overall_verdict": "Skipped"}
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("  Running LLM judge (DeepSeek)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     treat_responses = []
     for i in range(1, 11):
@@ -388,12 +388,12 @@ def main() -> None:
         )
 
         json_path = save_report(report, REPORTS_DIR)
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("  BENCHMARK COMPLETE")
         print(f"  Report: {json_path}")
         print(f"  Overall: {report.get('overall_verdict', 'unknown')}")
         print(f"  Summary: {report.get('summary', 'no summary')}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         clean_project()
 

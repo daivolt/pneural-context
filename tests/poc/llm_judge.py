@@ -108,24 +108,24 @@ def judge_pair(
             parsed = parse_judge_response(raw["content"])
 
             if order_a == "Control":
-                results[f"run_{len(judge_calls)+1}_order"] = "AB"
-                results[f"run_{len(judge_calls)+1}_winner_raw"] = parsed.get("winner", "unknown")
+                results[f"run_{len(judge_calls) + 1}_order"] = "AB"
+                results[f"run_{len(judge_calls) + 1}_winner_raw"] = parsed.get("winner", "unknown")
                 if parsed.get("winner") == "A":
-                    results[f"run_{len(judge_calls)+1}_winner_actual"] = "Control"
+                    results[f"run_{len(judge_calls) + 1}_winner_actual"] = "Control"
                 elif parsed.get("winner") == "B":
-                    results[f"run_{len(judge_calls)+1}_winner_actual"] = "Treatment"
+                    results[f"run_{len(judge_calls) + 1}_winner_actual"] = "Treatment"
                 else:
-                    results[f"run_{len(judge_calls)+1}_winner_actual"] = "tie"
+                    results[f"run_{len(judge_calls) + 1}_winner_actual"] = "tie"
             else:
-                results[f"run_{len(judge_calls)+1}_order"] = "BA"
+                results[f"run_{len(judge_calls) + 1}_order"] = "BA"
                 raw_winner = parsed.get("winner", "unknown")
                 if raw_winner == "A":
-                    results[f"run_{len(judge_calls)+1}_winner_actual"] = "Treatment"
+                    results[f"run_{len(judge_calls) + 1}_winner_actual"] = "Treatment"
                 elif raw_winner == "B":
-                    results[f"run_{len(judge_calls)+1}_winner_actual"] = "Control"
+                    results[f"run_{len(judge_calls) + 1}_winner_actual"] = "Control"
                 else:
-                    results[f"run_{len(judge_calls)+1}_winner_actual"] = "tie"
-                results[f"run_{len(judge_calls)+1}_winner_raw"] = raw_winner
+                    results[f"run_{len(judge_calls) + 1}_winner_actual"] = "tie"
+                results[f"run_{len(judge_calls) + 1}_winner_raw"] = raw_winner
 
             for metric in ["faithfulness", "correctness", "completeness", "convention"]:
                 key_a = f"{metric}_A"
@@ -143,11 +143,11 @@ def judge_pair(
             )
             time.sleep(1)
         except Exception as e:
-            results[f"run_{len(judge_calls)+1}_error"] = str(e)
+            results[f"run_{len(judge_calls) + 1}_error"] = str(e)
 
     votes = []
     for i in range(len(judge_calls)):
-        key = f"run_{i+1}_winner_actual"
+        key = f"run_{i + 1}_winner_actual"
         if key in results:
             votes.append(results[key])
 

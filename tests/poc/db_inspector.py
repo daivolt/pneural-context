@@ -103,7 +103,7 @@ def inspect_opencode_db(db_path: Path, session_id: str | None = None) -> dict[st
             results["pneural_ctx_locations"] = ctx_locations
 
             assistant_msgs = conn.execute(
-                "SELECT id, data FROM message WHERE session_id = ? " "AND data LIKE '%assistant%'",
+                "SELECT id, data FROM message WHERE session_id = ? AND data LIKE '%assistant%'",
                 (target_sid,),
             ).fetchall()
             results["assistant_message_count"] = len(assistant_msgs)

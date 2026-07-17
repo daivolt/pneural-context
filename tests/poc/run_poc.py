@@ -70,7 +70,8 @@ def setup_opencode_on_ryzen() -> None:
 }"""
 
     print("\n[1/5] Creating opencode.json on ryzen...")
-    cmd = f'''{ryan_ssh} "powershell -Command \\"Set-Content -Path 'C:\\Users\\daivolt\\.config\\opencode\\opencode.json' -Value '{opencode_json.replace("'", "\\'")}'  -Encoding UTF8\\""'''
+    escaped_json = opencode_json.replace("'", "\\'")
+    cmd = f"{ryan_ssh} \"powershell -Command \\\"Set-Content -Path 'C:\\\\Users\\\\daivolt\\\\.config\\\\opencode\\\\opencode.json' -Value '{escaped_json}' -Encoding UTF8\\\"\""
     sp.run(cmd, shell=True, capture_output=True)
 
     print("[2/5] Creating plugin directory on ryzen...")

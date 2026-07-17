@@ -188,7 +188,7 @@ class ConversationRunner:
         """Send all prompts and wait for responses via DB polling."""
         # Send all prompts with a delay between each
         for i, prompt in enumerate(prompts):
-            print(f"\n  [{self.arm}] === Turn {i+1}/{len(prompts)} ===")
+            print(f"\n  [{self.arm}] === Turn {i + 1}/{len(prompts)} ===")
             print(f"    [{self.arm}] Prompt: {prompt[:80]}...")
             self.send_prompt(prompt)
             # Wait for the LLM to process before sending next prompt
@@ -217,8 +217,10 @@ class ConversationRunner:
 
             out_dir = CONVERSATION_DIR / self.arm
             out_dir.mkdir(parents=True, exist_ok=True)
-            (out_dir / f"turn_{i+1:02d}_prompt.txt").write_text(prompt, encoding="utf-8")
-            (out_dir / f"turn_{i+1:02d}_response.txt").write_text(result["text"], encoding="utf-8")
+            (out_dir / f"turn_{i + 1:02d}_prompt.txt").write_text(prompt, encoding="utf-8")
+            (out_dir / f"turn_{i + 1:02d}_response.txt").write_text(
+                result["text"], encoding="utf-8"
+            )
 
         self.responses = results
         return results

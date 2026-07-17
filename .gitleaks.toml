@@ -1,0 +1,10 @@
+title = "Pneural-Context Gitleaks Config"
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+    "tests/poc/seed_data.json",
+    "tests/poc/conversation.json",
+    "tests/poc/benchmark.py",
+    "tests/poc/llm_judge.py",
+]
