@@ -217,8 +217,8 @@ class ConversationRunner:
 
             out_dir = CONVERSATION_DIR / self.arm
             out_dir.mkdir(parents=True, exist_ok=True)
-            (out_dir / f"turn_{i+1:02d}_prompt.txt").write_text(prompt)
-            (out_dir / f"turn_{i+1:02d}_response.txt").write_text(result["text"])
+            (out_dir / f"turn_{i+1:02d}_prompt.txt").write_text(prompt, encoding="utf-8")
+            (out_dir / f"turn_{i+1:02d}_response.txt").write_text(result["text"], encoding="utf-8")
 
         self.responses = results
         return results

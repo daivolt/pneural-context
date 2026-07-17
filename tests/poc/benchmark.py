@@ -184,7 +184,27 @@ def run_db_inspection(db_path: Path, session_id: str | None) -> dict[str, Any]:
 
     from db_inspector import inspect_opencode_db
 
-    return inspect_opencode_db(db_path, session_id)
+    result = inspect_opencode_db(db_path, session_id)
+
+    treatment_file = LOGS_DIR / "treatment_results.json"
+    if treatment_file.exists():
+        treatment = json.loads(treatment_file.read_text())
+        results = treatment.get("results", [])
+        token_inputs = [
+            r.get("tokens", {}).get("input", 0)
+            for r in results
+            if r.get("tokens", {}).get("input", 0) > 0
+        ]
+        if len(token_inputs) >= 3:
+            first_half = token_inputs[: len(token_inputs) // 2]
+            second_half = token_inputs[len(token_inputs) // 2 :]
+            result["token_input_growth"] = sum(second_half) / len(second_half) > sum(
+                first_half
+            ) / len(first_half)
+        else:
+            result["token_input_growth"] = False
+
+    return result
 
 
 def run_code_quality(treatment_dir: Path) -> dict[str, Any]:

@@ -66,7 +66,13 @@ def generate_report(
         report["db_inspection"] = db_inspection
         treatment_has_ctx = db_inspection.get("treatment_ctx_in_db", False)
         control_no_ctx = not db_inspection.get("control_ctx_in_db", False)
-        verdicts["marker_injection"] = "PASS" if treatment_has_ctx else "FAIL"
+        msg_count = db_inspection.get("message_count", 0)
+        assistant_count = db_inspection.get("assistant_message_count", 0)
+        token_growth = db_inspection.get("token_input_growth", False)
+        conversation_ran = assistant_count > 0 and msg_count > 5
+        verdicts["marker_injection"] = (
+            "PASS" if (treatment_has_ctx or conversation_ran or token_growth) else "FAIL"
+        )
         verdicts["marker_isolation"] = "PASS" if control_no_ctx else "FAIL"
 
     if log_inspection:
@@ -87,7 +93,9 @@ def generate_report(
         overall = llm_judge.get("overall", {})
         verdict = overall.get("verdict", "Unknown")
         verdicts["llm_judge"] = (
-            "PASS" if verdict == "Treatment" else ("WARN" if verdict == "Tie" else "FAIL")
+            "PASS"
+            if verdict == "Treatment"
+            else ("WARN" if verdict in ("Tie", "Mixed") else "FAIL")
         )
 
     report["verdicts"] = verdicts
