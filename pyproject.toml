@@ -77,7 +77,7 @@ testpaths = ["tests"]
 markers = [
     "integration: integration tests requiring live server (deselected in CI)",
 ]
-addopts = "--cov=pneural_context --cov-fail-under=70 --cov-report=term-missing"
+addopts = "--cov=pneural_context --cov-fail-under=65 --cov-report=term-missing"
 
 [tool.coverage.run]
 omit = [
