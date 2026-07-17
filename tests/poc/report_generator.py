@@ -90,8 +90,7 @@ def generate_report(
 
     if llm_judge:
         report["llm_judge"] = llm_judge
-        overall = llm_judge.get("overall", {})
-        verdict = overall.get("verdict", "Unknown")
+        verdict = llm_judge.get("overall_verdict", "Unknown")
         verdicts["llm_judge"] = (
             "PASS"
             if verdict == "Treatment"
