@@ -1,6 +1,12 @@
 name: CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deploy target: mediserv or ryzen"
+        required: true
+        default: mediserv
   push:
     branches: [main]
   pull_request:
@@ -138,3 +144,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Deploy to mediserv
+        if: github.event.inputs.target == 'mediserv'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 100.126.64.13
+          username: daivolt
+          password: ${{ secrets.MEDISERV_SSH_PASS }}
+          script: |
+            cd /opt/pneural-context
+            git pull origin main
+            /opt/pneural-context/.venv/bin/pip install -e ".[dev]" 2>/dev/null || true
+            echo "icaro9" | sudo -S systemctl restart pneural-context
+            sleep 5
+            curl -sf http://localhost:8778/health || { echo "Healthcheck failed"; exit 1; }
+      - name: Deploy to ryzen
+        if: github.event.inputs.target == 'ryzen'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 10.42.0.89
+          username: daivolt
+          password: ${{ secrets.RYZEN_SSH_PASS }}
+          script: |
+            cd C:\pneural-context
+            git pull origin main
+            C:\pneural-context\.venv\Scripts\pip.exe install -e ".[dev]"
+            powershell -Command "Start-ScheduledTask -TaskName PneuralContext"
+            powershell -Command "Start-Sleep -Seconds 5; try { Invoke-RestMethod -Uri http://localhost:8779/health } catch { Write-Error 'Healthcheck failed'; exit 1 }"
