@@ -27,6 +27,7 @@ class PBConfig:
     dedup_threshold_high: float = 0.85
     dedup_threshold_low: float = 0.55
     dedup_conversation_messages: int = 10
+    api_key: str = ""
 
     @classmethod
     def from_env(cls) -> PBConfig:
@@ -56,6 +57,7 @@ class PBConfig:
             dedup_conversation_messages=int(
                 os.environ.get("PNEURAL_DEDUP_CONVERSATION_MESSAGES", "10")
             ),
+            api_key=os.environ.get("PNEURAL_API_KEY", ""),
         )
 
     @classmethod

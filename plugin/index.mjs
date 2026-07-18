@@ -1,4 +1,5 @@
 const PNEURAL_URL = process.env.PNEURAL_CONTEXT_URL || "http://localhost:8778";
+const PNEURAL_API_KEY = process.env.PNEURAL_API_KEY || "";
 const TIMEOUT_MS = 5000;
 const RECORD_TIMEOUT_MS = 30000;
 
@@ -21,6 +22,12 @@ const STATUS_CACHE_TTL_MS = 30 * 1000;
 
 let currentSessionId = null;
 
+const authHeaders = () => {
+  const h = { "Content-Type": "application/json" };
+  if (PNEURAL_API_KEY) h["X-API-Key"] = PNEURAL_API_KEY;
+  return h;
+};
+
 const resolveProject = (ctx) => {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -40,7 +47,7 @@ const logError = async (project, source, message, stack) => {
   try {
     await fetch(`${PNEURAL_URL}/api/errors`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       signal: AbortSignal.timeout(3000),
       body: JSON.stringify({
         project,
@@ -57,6 +64,7 @@ const logError = async (project, source, message, stack) => {
 const getJSON = async (urlPath, project) => {
   try {
     const resp = await fetch(`${PNEURAL_URL}${urlPath}`, {
+      headers: authHeaders(),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!resp.ok) {
@@ -74,7 +82,7 @@ const postJSON = async (path, body, timeout = TIMEOUT_MS * 2, project) => {
   try {
     const resp = await fetch(`${PNEURAL_URL}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       signal: AbortSignal.timeout(timeout),
       body: JSON.stringify(body),
     });

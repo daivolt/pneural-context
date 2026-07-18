@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from . import pb_db
+from .auth import ApiKeyMiddleware
 from .logging import setup_logging
 from .pb_config import PBConfig
 from .pb_embeddings import EmbeddingClient, create_embedding_client
@@ -235,6 +236,10 @@ def create_app(config_override: PBConfig | None = None) -> FastAPI:
     app.state.embedding_client = None
     app.state.memoria = None
     app.state.background_tasks = []
+
+    if app_config.api_key:
+        app.add_middleware(ApiKeyMiddleware)
+        logger.info("API key authentication enabled")
 
     app.include_router(health.router)
     app.include_router(memory.router)

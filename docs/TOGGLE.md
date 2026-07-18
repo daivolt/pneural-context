@@ -64,3 +64,23 @@ curl -X POST http://localhost:8778/api/status/enable \
 
 State is stored **in-memory** (not persisted to DB). A server restart resets
 all projects to enabled. `routers/status.py` maintains `_disabled_projects: set[str]`.
+
+## API Authentication
+
+When `PNEURAL_API_KEY` is set on the server, all `/api/*` endpoints require
+an API key. The `/health` endpoint remains unauthenticated.
+
+Pass the key via:
+- `X-API-Key` header: `curl -H "X-API-Key: mysecret" http://localhost:8778/api/status`
+- `api_key` query param: `curl http://localhost:8778/api/status?api_key=mysecret`
+
+When `PNEURAL_API_KEY` is empty (default), authentication is disabled.
+
+### Plugin Configuration
+
+Set the same key in the plugin environment:
+```bash
+export PNEURAL_API_KEY=mysecret
+```
+
+The plugin sends `X-API-Key` on every request automatically.

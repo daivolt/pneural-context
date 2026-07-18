@@ -19,6 +19,13 @@ from mcp.types import TextContent, Tool
 from .help_texts import get_help
 
 PNEURAL_URL = os.environ.get("PNEURAL_URL", "http://localhost:8777")
+PNEURAL_API_KEY = os.environ.get("PNEURAL_API_KEY", "")
+
+
+def _headers() -> dict[str, str]:
+    if PNEURAL_API_KEY:
+        return {"X-API-Key": PNEURAL_API_KEY}
+    return {}
 
 
 def read_features() -> dict:
@@ -80,25 +87,29 @@ for feat, tools in FEATURE_TOOLS.items():
 
 async def api_get(path: str, params: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"{PNEURAL_URL}{path}", params=params) as resp:
+        async with session.get(f"{PNEURAL_URL}{path}", params=params, headers=_headers()) as resp:
             return dict(await resp.json())
 
 
 async def api_post(path: str, json_data: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        async with session.post(f"{PNEURAL_URL}{path}", json=json_data) as resp:
+        async with session.post(f"{PNEURAL_URL}{path}", json=json_data, headers=_headers()) as resp:
             return dict(await resp.json())
 
 
 async def api_patch(path: str, json_data: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        async with session.patch(f"{PNEURAL_URL}{path}", json=json_data) as resp:
+        async with session.patch(
+            f"{PNEURAL_URL}{path}", json=json_data, headers=_headers()
+        ) as resp:
             return dict(await resp.json())
 
 
 async def api_delete(path: str, json_data: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        async with session.delete(f"{PNEURAL_URL}{path}", json=json_data) as resp:
+        async with session.delete(
+            f"{PNEURAL_URL}{path}", json=json_data, headers=_headers()
+        ) as resp:
             return dict(await resp.json())
 
 

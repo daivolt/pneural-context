@@ -13,6 +13,7 @@
 | `PNEURAL_HOST` | `127.0.0.1` | Bind address |
 | `PNEURAL_PORT` | `8778` | Listen port |
 | `PNEURAL_LOG_LEVEL` | `INFO` | Logging level |
+| `PNEURAL_API_KEY` | — | Shared secret for /api/* endpoints. Empty = auth disabled |
 
 ## LLM / Turboquant
 
@@ -61,6 +62,7 @@
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PNEURAL_CONTEXT_URL` | `http://localhost:8778` | pneural-context API URL |
+| `PNEURAL_API_KEY` | — | Must match server PNEURAL_API_KEY for authenticated endpoints |
 | `PB_INJECT_ON_START` | `true` | Inject context on session start |
 | `PB_INJECT_ON_COMPACT` | `true` | Preserve markers during compaction |
 | `PB_RECORD_SESSIONS` | `false` | Record sessions to pb_memory |
