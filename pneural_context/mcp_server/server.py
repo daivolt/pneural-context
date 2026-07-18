@@ -69,6 +69,7 @@ FEATURE_TOOLS = {
     "decay": ["pb_decay_status", "pb_search_archive"],
     "costs": ["pb_cost_analysis", "pb_cost_trends", "pb_record_cost"],
     "status": ["pb_disable", "pb_enable", "pb_status"],
+    "errors": ["pb_errors_list", "pb_errors_clear"],
 }
 
 TOOL_TO_FEATURE = {}
@@ -92,6 +93,12 @@ async def api_post(path: str, json_data: dict | None = None) -> dict[str, Any]:
 async def api_patch(path: str, json_data: dict | None = None) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
         async with session.patch(f"{PNEURAL_URL}{path}", json=json_data) as resp:
+            return dict(await resp.json())
+
+
+async def api_delete(path: str, json_data: dict | None = None) -> dict[str, Any]:
+    async with aiohttp.ClientSession() as session:
+        async with session.delete(f"{PNEURAL_URL}{path}", json=json_data) as resp:
             return dict(await resp.json())
 
 
@@ -734,6 +741,44 @@ async def list_tools() -> list[Tool]:
         )
     )
 
+    tools.append(
+        Tool(
+            name="pb_errors_list",
+            description="List recent errors logged by the pneural-context plugin, MCP tools, or API for a project. Use this to diagnose issues during sessions.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name to list errors for"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max errors to return (default 50)",
+                    },
+                    "level": {
+                        "type": "string",
+                        "description": "Filter by level: error, warn, info",
+                    },
+                },
+                "required": ["project"],
+            },
+        )
+    )
+    tools.append(
+        Tool(
+            name="pb_errors_clear",
+            description="Clear all logged errors for a project.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "string",
+                        "description": "Project name to clear errors for",
+                    },
+                },
+                "required": ["project"],
+            },
+        )
+    )
+
     return tools
 
 
@@ -983,6 +1028,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if name == "pb_status":
             project = arguments.get("project", "")
             result = await api_get(f"/api/status?project={project}")
+            return [TextContent(type="text", text=fmt(result))]
+
+        if name == "pb_errors_list":
+            project = arguments.get("project", "")
+            limit = arguments.get("limit", 50)
+            level = arguments.get("level", "")
+            url = f"/api/errors?project={project}&limit={limit}"
+            if level:
+                url += f"&level={level}"
+            result = await api_get(url)
+            return [TextContent(type="text", text=fmt(result))]
+
+        if name == "pb_errors_clear":
+            project = arguments.get("project", "")
+            result = await api_delete(f"/api/errors?project={project}")
             return [TextContent(type="text", text=fmt(result))]
 
         return [TextContent(type="text", text=f"Unknown tool: {name}")]

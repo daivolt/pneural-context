@@ -5,7 +5,6 @@ import logging
 import os
 import subprocess
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 import asyncpg
@@ -29,6 +28,7 @@ from .routers import (
     costs,
     dashboard,
     decay,
+    errors,
     health,
     memory,
     papers,
@@ -55,20 +55,28 @@ async def _ensure_schema(pool: asyncpg.Pool) -> None:
     logger.info("Database extensions ensured")
 
 
-@asynccontextmanager
 async def _ensure_turboquant(config: PBConfig) -> subprocess.Popen | None:
     if not config.llm_launch_cmd:
         return None
 
-    import httpx
+    import aiohttp
 
-    try:
-        r = httpx.get(f"{config.llm_url.rstrip('/')}/models", timeout=3)
-        if r.status_code == 200:
-            logger.info("Turboquant LLM already running at %s", config.llm_url)
-            return None
-    except Exception:
-        pass
+    async def _check_llm() -> bool:
+        try:
+            timeout = aiohttp.ClientTimeout(total=3)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{config.llm_url.rstrip(chr(47))}/models",
+                    timeout=timeout,
+                    ssl=False,
+                ) as resp:
+                    return resp.status == 200
+        except Exception:
+            return False
+
+    if await _check_llm():
+        logger.info("Turboquant LLM already running at %s", config.llm_url)
+        return None
 
     logger.info("Starting turboquant LLM: %s", config.llm_launch_cmd)
     proc = subprocess.Popen(
@@ -77,13 +85,9 @@ async def _ensure_turboquant(config: PBConfig) -> subprocess.Popen | None:
 
     for _ in range(30):
         await asyncio.sleep(1)
-        try:
-            r = httpx.get(f"{config.llm_url.rstrip('/')}/models", timeout=2)
-            if r.status_code == 200:
-                logger.info("Turboquant LLM started (PID %d)", proc.pid)
-                return proc
-        except Exception:
-            pass
+        if await _check_llm():
+            logger.info("Turboquant LLM started (PID %d)", proc.pid)
+            return proc
 
     logger.warning("Turboquant LLM started but not yet reachable (PID %d)", proc.pid)
     return proc
@@ -222,7 +226,7 @@ def create_app(config_override: PBConfig | None = None) -> FastAPI:
         title="pneural-context",
         version="0.1.0a1",
         description="Persistent neural context for LLMs",
-        lifespan=lifespan,
+        lifespan=lifespan,  # type: ignore[arg-type]
     )
 
     app.state.config = app_config
@@ -250,6 +254,7 @@ def create_app(config_override: PBConfig | None = None) -> FastAPI:
     app.include_router(dashboard.router)
     app.include_router(projects.router)
     app.include_router(status.router)
+    app.include_router(errors.router)
 
     return app
 

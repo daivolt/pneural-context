@@ -164,3 +164,19 @@ CREATE INDEX IF NOT EXISTS idx_pb_papers_enriched_trgm ON pb_papers USING gin (e
 
 ALTER TABLE pb_papers ADD COLUMN IF NOT EXISTS embedding vector(768);
 CREATE INDEX IF NOT EXISTS idx_pb_papers_embedding ON pb_papers USING hnsw (embedding vector_cosine_ops);
+
+-- pb_errors: telemetry and error capture
+CREATE TABLE IF NOT EXISTS pb_errors (
+    id BIGSERIAL PRIMARY KEY,
+    project TEXT NOT NULL,
+    session_id TEXT,
+    source TEXT NOT NULL DEFAULT 'plugin',
+    level TEXT NOT NULL DEFAULT 'error',
+    message TEXT NOT NULL,
+    stack TEXT,
+    created_at DOUBLE PRECISION NOT NULL DEFAULT extract(epoch from now())
+);
+
+CREATE INDEX IF NOT EXISTS idx_pb_errors_project ON pb_errors(project);
+CREATE INDEX IF NOT EXISTS idx_pb_errors_created ON pb_errors(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pb_errors_level ON pb_errors(level);
