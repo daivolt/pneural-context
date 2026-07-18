@@ -38,7 +38,9 @@ class TestCreateApp:
             embed_dimensions=768,
         )
         app = create_app(config_override=config)
-        routes = [r.path for r in app.routes]
+        from fastapi.routing import APIRoute
+
+        routes = [r.path for r in app.routes if isinstance(r, APIRoute)]
         assert "/health" in routes
 
 
