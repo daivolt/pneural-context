@@ -38,10 +38,17 @@ class TestCreateApp:
             embed_dimensions=768,
         )
         app = create_app(config_override=config)
-        from fastapi.routing import APIRoute
+        from unittest.mock import AsyncMock
 
-        routes = [r.path for r in app.routes if isinstance(r, APIRoute)]
-        assert "/health" in routes
+        from fastapi.testclient import TestClient
+
+        app.state.pool = AsyncMock()
+        app.state.llm_client = None
+        app.state.embedding_client = None
+        app.state.memoria = None
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/health")
+        assert resp.status_code == 200
 
 
 class TestHealthEndpoint:
