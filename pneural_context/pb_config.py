@@ -11,6 +11,7 @@ class PBConfig:
     llm_url: str = "http://localhost:12345/v1"
     llm_model: str = "local-model"
     llm_api_key: str = ""
+    llm_launch_cmd: str = ""
     host: str = "0.0.0.0"
     port: int = 8777
     memoria_url: str = ""
@@ -34,6 +35,7 @@ class PBConfig:
             llm_url=os.environ.get("PNEURAL_LLM_URL", "http://localhost:12345/v1"),
             llm_model=os.environ.get("PNEURAL_LLM_MODEL", "local-model"),
             llm_api_key=os.environ.get("PNEURAL_LLM_API_KEY", ""),
+            llm_launch_cmd=os.environ.get("PNEURAL_LLM_LAUNCH_CMD", ""),
             host=os.environ.get("PNEURAL_HOST", "0.0.0.0"),
             port=int(os.environ.get("PNEURAL_PORT", "8777")),
             memoria_url=os.environ.get("PNEURAL_MEMORIA_URL", ""),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import subprocess
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -54,6 +55,39 @@ async def _ensure_schema(pool: asyncpg.Pool) -> None:
 
 
 @asynccontextmanager
+async def _ensure_turboquant(config: PBConfig) -> subprocess.Popen | None:
+    if not config.llm_launch_cmd:
+        return None
+
+    import httpx
+
+    try:
+        r = httpx.get(f"{config.llm_url.rstrip('/')}/models", timeout=3)
+        if r.status_code == 200:
+            logger.info("Turboquant LLM already running at %s", config.llm_url)
+            return None
+    except Exception:
+        pass
+
+    logger.info("Starting turboquant LLM: %s", config.llm_launch_cmd)
+    proc = subprocess.Popen(
+        config.llm_launch_cmd.split(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+
+    for _ in range(30):
+        await asyncio.sleep(1)
+        try:
+            r = httpx.get(f"{config.llm_url.rstrip('/')}/models", timeout=2)
+            if r.status_code == 200:
+                logger.info("Turboquant LLM started (PID %d)", proc.pid)
+                return proc
+        except Exception:
+            pass
+
+    logger.warning("Turboquant LLM started but not yet reachable (PID %d)", proc.pid)
+    return proc
+
+
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config: PBConfig = app.state.config
     setup_logging(os.environ.get("PNEURAL_LOG_LEVEL", "INFO"))
@@ -75,6 +109,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             with open(schema_path) as f:
                 await conn.execute(f.read())
         logger.info("Database schema applied")
+
+    turboquant_proc = await _ensure_turboquant(config)
+    app.state.turboquant_proc = turboquant_proc
 
     app.state.llm_client = LLMClient(
         url=config.llm_url, model=config.llm_model, api_key=config.llm_api_key
@@ -125,6 +162,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     for task in background_tasks:
         task.cancel()
+    if app.state.turboquant_proc and app.state.turboquant_proc.poll() is None:
+        app.state.turboquant_proc.terminate()
+        try:
+            app.state.turboquant_proc.wait(timeout=5)
+        except Exception:
+            app.state.turboquant_proc.kill()
+        logger.info("Turboquant LLM stopped")
     if app.state.llm_client:
         await app.state.llm_client.close()
     if app.state.embedding_client:
