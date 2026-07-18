@@ -68,6 +68,7 @@ FEATURE_TOOLS = {
     "anchors": ["pb_get_anchors"],
     "decay": ["pb_decay_status", "pb_search_archive"],
     "costs": ["pb_cost_analysis", "pb_cost_trends", "pb_record_cost"],
+    "status": ["pb_disable", "pb_enable", "pb_status"],
 }
 
 TOOL_TO_FEATURE = {}
@@ -693,6 +694,46 @@ async def list_tools() -> list[Tool]:
             )
         )
 
+    tools.append(
+        Tool(
+            name="pb_disable",
+            description="Disable pneural-context context injection for a project. When disabled, the plugin stops injecting PNEURAL_CTX into the system prompt until re-enabled.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name to disable"},
+                },
+                "required": ["project"],
+            },
+        )
+    )
+    tools.append(
+        Tool(
+            name="pb_enable",
+            description="Re-enable pneural-context context injection for a project that was previously disabled.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name to enable"},
+                },
+                "required": ["project"],
+            },
+        )
+    )
+    tools.append(
+        Tool(
+            name="pb_status",
+            description="Check whether pneural-context is currently enabled or disabled for a project.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project": {"type": "string", "description": "Project name to check"},
+                },
+                "required": ["project"],
+            },
+        )
+    )
+
     return tools
 
 
@@ -927,6 +968,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             if "breakdown" in arguments:
                 body["breakdown"] = arguments["breakdown"]
             result = await api_post("/api/costs", body)
+            return [TextContent(type="text", text=fmt(result))]
+
+        if name == "pb_disable":
+            result = await api_post(
+                "/api/status/disable", {"project": arguments.get("project", "")}
+            )
+            return [TextContent(type="text", text=fmt(result))]
+
+        if name == "pb_enable":
+            result = await api_post("/api/status/enable", {"project": arguments.get("project", "")})
+            return [TextContent(type="text", text=fmt(result))]
+
+        if name == "pb_status":
+            project = arguments.get("project", "")
+            result = await api_get(f"/api/status?project={project}")
             return [TextContent(type="text", text=fmt(result))]
 
         return [TextContent(type="text", text=f"Unknown tool: {name}")]

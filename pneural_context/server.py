@@ -37,6 +37,7 @@ from .routers import (
     recall,
     reindex,
     session,
+    status,
 )
 
 logger = logging.getLogger("pneural_context.server")
@@ -248,6 +249,7 @@ def create_app(config_override: PBConfig | None = None) -> FastAPI:
     app.include_router(config.router)
     app.include_router(dashboard.router)
     app.include_router(projects.router)
+    app.include_router(status.router)
 
     return app
 
