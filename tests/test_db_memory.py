@@ -32,6 +32,7 @@ def memory_record():
 
 @pytest.mark.asyncio
 async def test_add_memory_entry(mock_pool, memory_record):
+    mock_pool.fetch = AsyncMock(return_value=[])
     mock_pool.fetchrow = AsyncMock(return_value={"id": 42})
     result = await pb_db.add_memory_entry("test-project", "hello world", pool=mock_pool)
     assert result == 42
@@ -41,6 +42,7 @@ async def test_add_memory_entry(mock_pool, memory_record):
 @pytest.mark.asyncio
 async def test_add_memory_entry_critical(memory_record):
     pool = AsyncMock()
+    pool.fetch = AsyncMock(return_value=[])
     pool.fetchrow = AsyncMock(return_value={"id": 99})
     result = await pb_db.add_memory_entry("proj", "critical note", "critical", pool=pool)
     assert result == 99

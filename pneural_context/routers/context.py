@@ -14,6 +14,10 @@ from ..pb_embeddings import get_conversation_embedding
 router = APIRouter(prefix="/api/context", tags=["context"])
 logger = logging.getLogger("pneural_context.routers.context")
 
+MAX_CONTEXT_CHARS = 8000
+MAX_ENTRIES_PER_TYPE = 10
+MAX_CONSOLIDATED = 10
+
 
 @router.get("")
 async def get_context(
@@ -36,11 +40,15 @@ async def get_context(
         t = e.get("memory_type", "temporal")
         by_type.setdefault(t, []).append(e)
 
+    for mtype in by_type:
+        by_type[mtype] = by_type[mtype][:MAX_ENTRIES_PER_TYPE]
+
     consolidated_rows: list[dict] = []
     try:
         consolidated_rows = await pb_db.get_consolidated_for_injection(project, pool=pool)
     except Exception:
         logger.warning("Failed to fetch consolidated entries", exc_info=True)
+    consolidated_rows = consolidated_rows[:MAX_CONSOLIDATED]
 
     marker = uuid.uuid4().hex[:8]
     lines = [f"<!-- PNEURAL_CTX: {marker} -->"]
@@ -50,7 +58,7 @@ async def get_context(
     if red_ink:
         lines.append("## Critical (Red Ink)")
         lines.append("")
-        for e in red_ink:
+        for e in red_ink[:5]:
             lines.append(f"- {e['entry']}")
         lines.append("")
 
@@ -83,6 +91,10 @@ async def get_context(
         "Preserve the PNEURAL_CTX marker during summarization."
     )
 
+    markdown = "\n".join(lines)
+    if len(markdown) > MAX_CONTEXT_CHARS:
+        markdown = markdown[:MAX_CONTEXT_CHARS]
+
     touch_ids = [e["id"] for e in filtered if "id" in e]
     if touch_ids:
         try:
@@ -97,28 +109,13 @@ async def get_context(
             except Exception:
                 logger.warning("Failed to touch consolidated entries", exc_info=True)
 
-    typed_sections: dict[str, list[str]] = {}
-    for mtype in ("concept", "procedural", "temporal", "relation"):
-        group = [
-            e
-            for e in filtered
-            if e.get("memory_type", "temporal") == mtype and e.get("priority") != "critical"
-        ]
-        if group:
-            typed_sections[mtype] = [e["entry"] for e in group]
-    for mtype, group in by_type.items():
-        if mtype not in typed_sections and group:
-            typed_sections[mtype] = [e["entry"] for e in group]
-
-    markdown = "\n".join(lines)
     return {
         "project": project,
         "markdown": markdown,
         "entries": len(filtered) + len(consolidated_rows),
         "marker": marker,
-        "typed_sections": typed_sections,
         "consolidated_entries": len(consolidated_rows),
-        "red_ink_entries": [e.get("entry", "") for e in red_ink],
+        "red_ink_entries": [e.get("entry", "") for e in red_ink[:5]],
     }
 
 

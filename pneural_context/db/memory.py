@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from difflib import SequenceMatcher
 
 import asyncpg
 
@@ -10,14 +12,49 @@ from .pool import _get_pool
 logger = logging.getLogger("pneural_context.db.memory")
 
 
+def _normalize(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    return re.sub(r"\s+", " ", text.strip().lower())
+
+
+def _is_similar(text: str, existing: list[str], threshold: float = 0.8) -> bool:
+    if not isinstance(text, str):
+        return False
+    norm = _normalize(text)
+    if not norm:
+        return True
+    for ex in existing:
+        if not isinstance(ex, str):
+            continue
+        if SequenceMatcher(None, norm, _normalize(ex)).quick_ratio() >= threshold:
+            return True
+    return False
+
+
 async def add_memory_entry(
     project: str,
     text: str,
     priority: str = "normal",
     memory_type: str | None = None,
+    dedup_threshold: float = 0.8,
     pool: asyncpg.Pool | None = None,
 ) -> int:
     p = await _get_pool(pool)
+    existing_rows = await p.fetch(
+        "SELECT entry FROM pb_memory WHERE project = $1",
+        project,
+    )
+    existing_texts = [r["entry"] for r in existing_rows]
+    if _is_similar(text, existing_texts, dedup_threshold):
+        logger.info("Skipping duplicate memory entry for project %s", project)
+        existing_ids = await p.fetch(
+            "SELECT id FROM pb_memory WHERE project = $1 ORDER BY id DESC LIMIT 1",
+            project,
+        )
+        if existing_ids:
+            return existing_ids[0]["id"]
+        return -1
     mt = memory_type or ("red" if priority == "critical" else "temporal")
     row = await p.fetchrow(
         """INSERT INTO pb_memory (project, entry, priority, memory_type, strength, last_accessed)
@@ -144,10 +181,7 @@ async def update_memory_type_by_id(
 async def touch_memory_access(project: str, index: int, pool: asyncpg.Pool | None = None) -> bool:
     p = await _get_pool(pool)
     result = await p.execute(
-        """UPDATE pb_memory
-           SET last_accessed = extract(epoch from now()),
-               strength = LEAST(1.0, strength + 0.3)
-           WHERE project = $1 AND id = $2""",
+        "UPDATE pb_memory SET last_accessed = extract(epoch from now()) WHERE project = $1 AND id = $2",
         project,
         index,
     )
@@ -159,10 +193,7 @@ async def touch_memory_by_ids(ids: list[int], pool: asyncpg.Pool | None = None) 
         return 0
     p = await _get_pool(pool)
     result = await p.execute(
-        """UPDATE pb_memory
-           SET last_accessed = extract(epoch from now()),
-               strength = LEAST(1.0, strength + 0.3)
-           WHERE id = ANY($1::bigint[])""",
+        "UPDATE pb_memory SET last_accessed = extract(epoch from now()) WHERE id = ANY($1::bigint[])",
         ids,
     )
     count = int(result.split()[-1]) if result else 0

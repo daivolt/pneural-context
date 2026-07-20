@@ -4,6 +4,7 @@ import asyncpg
 from fastapi import APIRouter, HTTPException, Request
 
 from .. import pb_db
+from ..db.memory import _is_similar, _normalize
 from ..deps import PoolDep
 from ..models.memory import (
     AddMemoryRequest,
@@ -109,3 +110,31 @@ async def classify_memory(
 ) -> dict:
     llm_client: LLMClient | None = getattr(request.app.state, "llm_client", None)
     return await auto_classify(body.project, llm=llm_client, pool=pool)
+
+
+@router.post("/dedup")
+async def dedup_memory(body: dict, pool: asyncpg.Pool = PoolDep) -> dict:
+    project = body.get("project", "")
+    threshold = body.get("threshold", 0.8)
+    entries = await pb_db.get_memory_entries_full(project, pool=pool)
+    if not entries:
+        return {"project": project, "removed": 0, "reason": "no entries"}
+    seen: dict[str, int] = {}
+    to_remove: list[int] = []
+    for entry in entries:
+        norm = _normalize(entry.get("entry", ""))
+        if not norm:
+            continue
+        matched = False
+        for _seen_norm, _seen_id in list(seen.items()):
+            if _is_similar(entry.get("entry", ""), list(seen.keys()), threshold):
+                to_remove.append(entry["id"])
+                matched = True
+                break
+        if not matched:
+            seen[norm] = entry["id"]
+    removed = 0
+    for entry_id in to_remove:
+        await pb_db.delete_memory_entry(project, entry_id, pool=pool)
+        removed += 1
+    return {"project": project, "removed": removed, "kept": len(entries) - removed}
