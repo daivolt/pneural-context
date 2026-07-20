@@ -53,7 +53,7 @@ async def add_memory_entry(
             project,
         )
         if existing_ids:
-            return existing_ids[0]["id"]
+            return int(existing_ids[0]["id"])
         return -1
     mt = memory_type or ("red" if priority == "critical" else "temporal")
     row = await p.fetchrow(

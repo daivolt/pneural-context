@@ -174,4 +174,4 @@ async def delete_consolidated(entry_id: int, pool: asyncpg.Pool | None = None) -
         "DELETE FROM pb_consolidated_memory WHERE id = $1",
         entry_id,
     )
-    return result.endswith("1")
+    return bool(result.endswith("1"))
