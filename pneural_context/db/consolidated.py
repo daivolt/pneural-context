@@ -166,3 +166,12 @@ async def touch_consolidated_by_ids(ids: list[int], pool: asyncpg.Pool | None = 
     )
     count = int(result.split()[-1]) if result else 0
     return count
+
+
+async def delete_consolidated(entry_id: int, pool: asyncpg.Pool | None = None) -> bool:
+    p = await _get_pool(pool)
+    result = await p.execute(
+        "DELETE FROM pb_consolidated_memory WHERE id = $1",
+        entry_id,
+    )
+    return result.endswith("1")

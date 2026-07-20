@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
+from difflib import SequenceMatcher
 from typing import Any
 
 import asyncpg
@@ -22,6 +24,51 @@ def _to_epoch(val: Any) -> float:
         return float(val)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _normalize(content: str) -> str:
+    return re.sub(r"\s+", " ", content.strip().lower())
+
+
+def _is_duplicate(content: str, existing: set[str], threshold: float = 0.8) -> bool:
+    norm = _normalize(content)
+    if not norm:
+        return True
+    for existing_norm in existing:
+        if SequenceMatcher(None, norm, existing_norm).quick_ratio() >= threshold:
+            return True
+    return False
+
+
+async def dedup_consolidated(
+    project: str, threshold: float = 0.8, pool: asyncpg.Pool | None = None
+) -> dict[str, Any]:
+    all_entries = await pb_db.get_consolidated(project, pool=pool)
+    if not all_entries:
+        return {"project": project, "removed": 0, "reason": "no entries"}
+
+    seen: dict[str, int] = {}
+    to_remove: list[int] = []
+    for entry in all_entries:
+        norm = _normalize(entry.get("content", ""))
+        if not norm:
+            to_remove.append(entry["id"])
+            continue
+        matched = False
+        for seen_norm, _ in list(seen.items()):
+            if SequenceMatcher(None, norm, seen_norm).quick_ratio() >= threshold:
+                matched = True
+                to_remove.append(entry["id"])
+                break
+        if not matched:
+            seen[norm] = entry["id"]
+
+    removed = 0
+    for entry_id in to_remove:
+        await pb_db.delete_consolidated(entry_id, pool=pool)
+        removed += 1
+
+    return {"project": project, "removed": removed, "kept": len(all_entries) - removed}
 
 
 async def auto_classify(
@@ -120,8 +167,9 @@ async def run_consolidation(
 
     existing_consolidated = await pb_db.get_consolidated_by_tier(project, "consolidated", pool=pool)
     existing_timeless = await pb_db.get_consolidated_by_tier(project, "timeless", pool=pool)
-    existing_contents = {c.get("content", "")[:100] for c in existing_consolidated}
-    existing_contents.update({c.get("content", "")[:100] for c in existing_timeless})
+    all_existing = existing_consolidated + existing_timeless
+    existing_norms: set[str] = {_normalize(c.get("content", "")) for c in all_existing}
+    existing_norms.discard("")
 
     groups_to_consolidate = []
     if len(critical) >= 3:
@@ -137,8 +185,7 @@ async def run_consolidation(
 
         if llm is None:
             content = " | ".join(e["entry"][:200] for e in group)
-            prefix = content[:100]
-            if prefix in existing_contents:
+            if _is_duplicate(content, existing_norms):
                 continue
             await pb_db.add_consolidated(
                 project,
@@ -149,7 +196,7 @@ async def run_consolidation(
                 pool=pool,
             )
             total_insights += 1
-            existing_contents.add(prefix)
+            existing_norms.add(_normalize(content))
             continue
         try:
             llm_result = await llm.consolidate(group)
@@ -162,8 +209,7 @@ async def run_consolidation(
                     continue
                 if mtype not in ("concept", "procedural", "relation", "temporal"):
                     mtype = "concept"
-                prefix = content[:100]
-                if prefix in existing_contents:
+                if _is_duplicate(content, existing_norms):
                     continue
                 await pb_db.add_consolidated(
                     project,
@@ -175,12 +221,11 @@ async def run_consolidation(
                     pool=pool,
                 )
                 total_insights += 1
-                existing_contents.add(prefix)
+                existing_norms.add(_normalize(content))
         except Exception:
             logger.warning(f"LLM consolidation failed for {project}")
             content = " | ".join(e["entry"][:200] for e in group)
-            prefix = content[:100]
-            if prefix in existing_contents:
+            if _is_duplicate(content, existing_norms):
                 continue
             await pb_db.add_consolidated(
                 project,
@@ -192,11 +237,13 @@ async def run_consolidation(
             )
             total_insights += 1
             result["errors"] += 1
-            existing_contents.add(prefix)
+            existing_norms.add(_normalize(content))
 
     result["insights_created"] = total_insights
 
     consolidated_entries = await pb_db.get_consolidated_for_injection(project, pool=pool)
+    timeless_norms: set[str] = {_normalize(e.get("content", "")) for e in existing_timeless}
+    timeless_norms.discard("")
     promoted_ids: set[int] = set()
 
     for entry in consolidated_entries:
@@ -205,10 +252,13 @@ async def run_consolidation(
         if entry.get("tier") == "immediate":
             continue
         if entry.get("priority") == "critical":
+            if _is_duplicate(entry.get("content", ""), timeless_norms):
+                continue
             ok = await pb_db.promote_consolidated(entry["id"], "timeless", pool=pool)
             if ok:
                 result["consolidated_to_timeless"] += 1
                 promoted_ids.add(entry["id"])
+                timeless_norms.add(_normalize(entry.get("content", "")))
 
     for entry in consolidated_entries:
         if entry["id"] in promoted_ids:
@@ -220,10 +270,13 @@ async def run_consolidation(
         strength = entry.get("strength", 0.5)
         source_count = len(entry.get("source_sessions", []) or [])
         if strength >= 0.8 or source_count >= 3:
+            if _is_duplicate(entry.get("content", ""), timeless_norms):
+                continue
             ok = await pb_db.promote_consolidated(entry["id"], "timeless", pool=pool)
             if ok:
                 result["consolidated_to_timeless"] += 1
                 promoted_ids.add(entry["id"])
+                timeless_norms.add(_normalize(entry.get("content", "")))
 
     now = time.time()
     thirty_days_ago = now - 30 * 86400

@@ -1,6 +1,7 @@
 from .consolidated import (
     add_consolidated,
     add_consolidated_entry,
+    delete_consolidated,
     get_consolidated,
     get_consolidated_by_tier,
     get_consolidated_for_injection,
@@ -108,6 +109,7 @@ __all__ = [
     "hybrid_search_procedures",
     "hybrid_search_papers",
     "reindex_table",
+    "delete_consolidated",
     "dedup_context_entries",
     "get_all_projects",
 ]
