@@ -10,15 +10,18 @@ logger = logging.getLogger("pneural_context.pb_llm")
 
 
 class LLMClient:
-    def __init__(self, url: str, model: str = "local-model", api_key: str = ""):
+    def __init__(
+        self, url: str, model: str = "local-model", api_key: str = "", timeout: float = 60.0
+    ):
         self.url = url.rstrip("/")
         self.model = model
         self.api_key = api_key
+        self.timeout = timeout
         self._session: aiohttp.ClientSession | None = None
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout))
         return self._session
 
     async def _chat(self, messages: list[dict], temperature: float = 0.3) -> str:
@@ -33,7 +36,10 @@ class LLMClient:
         }
         try:
             async with session.post(
-                f"{self.url}/chat/completions", json=payload, headers=headers
+                f"{self.url}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
             ) as resp:
                 resp.raise_for_status()
                 data = await resp.json()

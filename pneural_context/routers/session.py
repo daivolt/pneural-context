@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import asyncpg
@@ -13,6 +14,8 @@ logger = logging.getLogger("pneural_context.routers.session")
 
 router = APIRouter(prefix="/api/session", tags=["session"])
 
+_SESSION_SUMMARY_TIMEOUT = 30
+
 
 @router.post("/record")
 async def record_session(
@@ -24,7 +27,12 @@ async def record_session(
     summary = ""
     if llm_client:
         try:
-            summary = await llm_client.summarize_session(body.title, body.messages)
+            summary = await asyncio.wait_for(
+                llm_client.summarize_session(body.title, body.messages),
+                timeout=_SESSION_SUMMARY_TIMEOUT,
+            )
+        except TimeoutError:
+            logger.warning("Session summarization timed out after %ds", _SESSION_SUMMARY_TIMEOUT)
         except Exception:
             logger.warning("Session summarization failed, storing raw title")
     if not summary:
