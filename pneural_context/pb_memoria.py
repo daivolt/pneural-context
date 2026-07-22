@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 try:
     import httpx
@@ -32,17 +32,95 @@ class MemoriaBridge:
         params: dict[str, Any] = {"q": query, "limit": limit}
         if project:
             params["project"] = project
-        resp = await client.get(f"{self.url}/api/recall", params=params)
-        resp.raise_for_status()
-        data = resp.json()
-        return list(data.get("results", []))
+        try:
+            resp = await client.get(f"{self.url}/recall", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+            return list(data.get("results", []))
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria recall failed: %s", exc)
+            return []
 
-    async def get_sessions(self, project: str) -> list[dict[str, Any]]:
+    async def get_review(self, project: str) -> list[dict[str, Any]]:
         client = await self._ensure_client()
-        resp = await client.get(f"{self.url}/api/sessions", params={"project": project})
-        resp.raise_for_status()
-        data = resp.json()
-        return list(data.get("sessions", []))
+        try:
+            resp = await client.get(f"{self.url}/review", params={"project": project})
+            resp.raise_for_status()
+            data = resp.json()
+            return list(data.get("sessions", []))
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria get_review failed: %s", exc)
+            return []
+
+    async def add_memory(
+        self, project: str, text: str, priority: str = "normal", memory_type: str | None = None
+    ) -> dict[str, Any] | None:
+        client = await self._ensure_client()
+        payload: dict[str, Any] = {"text": text, "priority": priority}
+        if memory_type:
+            payload["memory_type"] = memory_type
+        try:
+            resp = await client.post(f"{self.url}/memory/{project}", json=payload)
+            resp.raise_for_status()
+            return cast(dict[str, Any], resp.json())
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria add_memory failed: %s", exc)
+            return None
+
+    async def get_memory_full(self, project: str) -> list[dict[str, Any]]:
+        client = await self._ensure_client()
+        try:
+            resp = await client.get(f"{self.url}/memory/{project}/full")
+            resp.raise_for_status()
+            data = resp.json()
+            return list(data.get("entries", []))
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria get_memory_full failed: %s", exc)
+            return []
+
+    async def get_red_ink(self, project: str, min_strength: float = 0.0) -> list[dict[str, Any]]:
+        client = await self._ensure_client()
+        try:
+            resp = await client.get(
+                f"{self.url}/red-ink/{project}", params={"min_strength": min_strength}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return list(data.get("entries", []))
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria get_red_ink failed: %s", exc)
+            return []
+
+    async def get_context(self, project: str) -> dict[str, Any] | None:
+        client = await self._ensure_client()
+        try:
+            resp = await client.get(f"{self.url}/ctx/{project}")
+            resp.raise_for_status()
+            return cast(dict[str, Any], resp.json())
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria get_context failed: %s", exc)
+            return None
+
+    async def trigger_consolidation(self, project: str) -> dict[str, Any] | None:
+        client = await self._ensure_client()
+        try:
+            resp = await client.post(f"{self.url}/consolidation/{project}/trigger")
+            resp.raise_for_status()
+            return cast(dict[str, Any], resp.json())
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria trigger_consolidation failed: %s", exc)
+            return None
+
+    async def register_peer(self, name: str, url: str) -> dict[str, Any] | None:
+        client = await self._ensure_client()
+        payload = {"name": name, "url": url}
+        try:
+            resp = await client.post(f"{self.url}/federation/peers", json=payload)
+            resp.raise_for_status()
+            return cast(dict[str, Any], resp.json())
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            logger.warning("Memoria register_peer failed: %s", exc)
+            return None
 
     async def close(self) -> None:
         if self._client and not self._client.is_closed:
