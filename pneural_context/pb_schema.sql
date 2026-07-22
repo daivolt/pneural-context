@@ -40,6 +40,20 @@ ALTER TABLE pb_memory ADD CONSTRAINT chk_pb_memory_type
 ALTER TABLE pb_memory ADD COLUMN IF NOT EXISTS embedding vector(768);
 CREATE INDEX IF NOT EXISTS idx_pb_memory_embedding ON pb_memory USING hnsw (embedding vector_cosine_ops);
 
+ALTER TABLE pb_memory ADD COLUMN IF NOT EXISTS pb_sync_source VARCHAR(20) DEFAULT 'local';
+CREATE INDEX IF NOT EXISTS idx_pb_memory_sync_source ON pb_memory(pb_sync_source);
+
+-- pb_sync_state: watermark tracking for memoria sync
+CREATE TABLE IF NOT EXISTS pb_sync_state (
+    id SERIAL PRIMARY KEY,
+    project VARCHAR(200) NOT NULL,
+    peer VARCHAR(100) NOT NULL DEFAULT 'memoria',
+    last_sync_at DOUBLE PRECISION NOT NULL DEFAULT 0,
+    last_sync_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    updated_at DOUBLE PRECISION NOT NULL DEFAULT extract(epoch from now()),
+    UNIQUE (project, peer)
+);
+
 -- pb_procedural_memory: basal ganglia procedural memory
 CREATE TABLE IF NOT EXISTS pb_procedural_memory (
     id SERIAL PRIMARY KEY,

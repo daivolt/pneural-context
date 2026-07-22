@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncpg
 from fastapi import APIRouter, HTTPException, Request
 
@@ -16,14 +18,26 @@ from ..models.memory import (
 from ..pb_engine import auto_classify
 from ..pb_llm import LLMClient
 
+logger = logging.getLogger("pneural_context.routers.memory")
+
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 
 @router.post("")
-async def add_memory(body: AddMemoryRequest, pool: asyncpg.Pool = PoolDep) -> dict:
+async def add_memory(
+    body: AddMemoryRequest, request: Request, pool: asyncpg.Pool = PoolDep
+) -> dict:
     entry_id = await pb_db.add_memory_entry(
         body.project, body.text, body.priority, body.memory_type, pool=pool
     )
+    memoria = getattr(request.app.state, "memoria", None)
+    if memoria and entry_id > 0:
+        try:
+            await pb_db.push_to_memoria(
+                body.project, body.text, body.priority, body.memory_type, memoria
+            )
+        except Exception:
+            logger.warning("Push to memoria failed for project %s", body.project, exc_info=True)
     return {"id": entry_id, "project": body.project, "text": body.text, "priority": body.priority}
 
 

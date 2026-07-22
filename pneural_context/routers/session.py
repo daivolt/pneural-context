@@ -40,6 +40,12 @@ async def record_session(
     entry_id = await pb_db.add_memory_entry(
         body.project, summary, "normal", body.memory_type, pool=pool
     )
+    memoria = getattr(request.app.state, "memoria", None)
+    if memoria and entry_id > 0:
+        try:
+            await pb_db.push_to_memoria(body.project, summary, "normal", body.memory_type, memoria)
+        except Exception:
+            logger.warning("Push to memoria failed for project %s", body.project, exc_info=True)
     return {
         "id": entry_id,
         "project": body.project,

@@ -56,6 +56,7 @@ from .search import (
     vector_search_papers,
     vector_search_procedures,
 )
+from .sync import pull_from_memoria, push_to_memoria
 from .utils import get_all_projects
 
 __all__ = [
@@ -111,5 +112,7 @@ __all__ = [
     "reindex_table",
     "delete_consolidated",
     "dedup_context_entries",
+    "pull_from_memoria",
+    "push_to_memoria",
     "get_all_projects",
 ]

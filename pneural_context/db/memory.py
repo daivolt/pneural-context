@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from difflib import SequenceMatcher
@@ -32,12 +33,17 @@ def _is_similar(text: str, existing: list[str], threshold: float = 0.8) -> bool:
     return False
 
 
+def _content_hash(text: str) -> str:
+    return hashlib.sha256(_normalize(text).encode()).hexdigest()
+
+
 async def add_memory_entry(
     project: str,
     text: str,
     priority: str = "normal",
     memory_type: str | None = None,
     dedup_threshold: float = 0.8,
+    source_system: str = "local",
     pool: asyncpg.Pool | None = None,
 ) -> int:
     p = await _get_pool(pool)
@@ -57,13 +63,14 @@ async def add_memory_entry(
         return -1
     mt = memory_type or ("red" if priority == "critical" else "temporal")
     row = await p.fetchrow(
-        """INSERT INTO pb_memory (project, entry, priority, memory_type, strength, last_accessed)
-           VALUES ($1, $2, $3, $4, 1.0, extract(epoch from now()))
+        """INSERT INTO pb_memory (project, entry, priority, memory_type, strength, last_accessed, pb_sync_source)
+           VALUES ($1, $2, $3, $4, 1.0, extract(epoch from now()), $5)
            RETURNING id""",
         project,
         text,
         priority,
         mt,
+        source_system,
     )
     entry_id: int = row["id"]
     if pool_mod._embedding_client:

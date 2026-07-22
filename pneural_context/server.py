@@ -164,7 +164,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.background_tasks = background_tasks
     if config.memoria_enabled and config.memoria_url and config.sync_interval_seconds > 0:
         task = asyncio.create_task(
-            _sync_loop(config.sync_interval_seconds, pool, app.state.memoria)
+            _sync_loop(config.sync_interval_seconds, pool, app.state.memoria, config.port)
         )
         background_tasks.append(task)
         app.state.background_tasks = background_tasks
@@ -229,7 +229,9 @@ async def _consolidation_loop(
             logger.exception("Consolidation loop error")
 
 
-async def _sync_loop(interval: float, pool: asyncpg.Pool, memoria: MemoriaBridge) -> None:
+async def _sync_loop(
+    interval: float, pool: asyncpg.Pool, memoria: MemoriaBridge, port: int = 8777
+) -> None:
     while True:
         try:
             await asyncio.sleep(interval)
@@ -238,17 +240,17 @@ async def _sync_loop(interval: float, pool: asyncpg.Pool, memoria: MemoriaBridge
             projects = await pb_db.get_all_projects(pool=pool)
             for project in projects:
                 try:
-                    entries = await memoria.get_memory_full(project)
-                    if entries:
+                    inserted = await pb_db.pull_from_memoria(project, memoria, pool=pool)
+                    if inserted > 0:
                         logger.info(
-                            "Sync: pulled %d entries from memoria for project %s",
-                            len(entries),
+                            "Sync: pulled %d new entries from memoria for project %s",
+                            inserted,
                             project,
                         )
                 except Exception:
                     logger.warning("Sync pull failed for project %s", project, exc_info=True)
             try:
-                await memoria.register_peer("pneural-context", "http://localhost:8777")
+                await memoria.register_peer("pneural-context", f"http://localhost:{port}")
             except Exception:
                 pass
         except asyncio.CancelledError:
