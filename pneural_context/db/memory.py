@@ -102,7 +102,7 @@ async def get_memory_entries_full(project: str, pool: asyncpg.Pool | None = None
     p = await _get_pool(pool)
     rows = await p.fetch(
         """SELECT id, project, entry, priority, memory_type, strength,
-                  last_accessed, created_at, search_enrichments
+                  last_accessed, created_at, search_enrichments, pb_sync_source
            FROM pb_memory WHERE project = $1 ORDER BY id""",
         project,
     )

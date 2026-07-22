@@ -19,6 +19,7 @@ async def apply_decay(
     await p.execute(
         """UPDATE pb_memory SET strength = strength * $1
            WHERE priority != 'critical'
+             AND (pb_sync_source IS NULL OR pb_sync_source = 'local')
              AND (last_accessed IS NULL OR last_accessed < $2)""",
         decay_factor,
         recent_cutoff,
@@ -26,6 +27,7 @@ async def apply_decay(
     await p.execute(
         """UPDATE pb_memory SET strength = GREATEST(strength * $1, 0.5)
            WHERE priority = 'critical'
+             AND (pb_sync_source IS NULL OR pb_sync_source = 'local')
              AND (last_accessed IS NULL OR last_accessed < $2)""",
         decay_factor,
         recent_cutoff,
@@ -65,7 +67,8 @@ async def archive_decay(threshold: float = 0.1, pool: asyncpg.Pool | None = None
             rows = await conn.fetch(
                 """SELECT id, project, entry, priority, memory_type, strength, created_at
                    FROM pb_memory
-                   WHERE strength < $1 AND priority != 'critical'""",
+                   WHERE strength < $1 AND priority != 'critical'
+                     AND (pb_sync_source IS NULL OR pb_sync_source = 'local')""",
                 threshold,
             )
             for row in rows:

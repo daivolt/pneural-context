@@ -127,6 +127,8 @@ async def run_consolidation(
     if not entries:
         return {"project": project, "consolidated": 0, "reason": "no entries"}
 
+    entries = [e for e in entries if e.get("pb_sync_source", "local") != "memoria"]
+
     result: dict[str, Any] = {
         "immediate_created": 0,
         "immediate_updated": 0,
