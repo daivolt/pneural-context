@@ -162,6 +162,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         background_tasks.append(task)
         app.state.background_tasks = background_tasks
+    if config.memoria_enabled and config.memoria_url and config.sync_interval_seconds > 0:
+        task = asyncio.create_task(
+            _sync_loop(config.sync_interval_seconds, pool, app.state.memoria)
+        )
+        background_tasks.append(task)
+        app.state.background_tasks = background_tasks
+        try:
+            await app.state.memoria.register_peer(
+                "pneural-context", f"http://localhost:{config.port}"
+            )
+            logger.info("Registered as peer with memoria at %s", config.memoria_url)
+        except Exception:
+            logger.warning("Failed to register as peer with memoria (will retry on sync)")
 
     logger.info("pneural-context server started on %s:%s", config.host, config.port)
     yield
@@ -214,6 +227,34 @@ async def _consolidation_loop(
             break
         except Exception:
             logger.exception("Consolidation loop error")
+
+
+async def _sync_loop(interval: float, pool: asyncpg.Pool, memoria: MemoriaBridge) -> None:
+    while True:
+        try:
+            await asyncio.sleep(interval)
+            if memoria is None:
+                continue
+            projects = await pb_db.get_all_projects(pool=pool)
+            for project in projects:
+                try:
+                    entries = await memoria.get_memory_full(project)
+                    if entries:
+                        logger.info(
+                            "Sync: pulled %d entries from memoria for project %s",
+                            len(entries),
+                            project,
+                        )
+                except Exception:
+                    logger.warning("Sync pull failed for project %s", project, exc_info=True)
+            try:
+                await memoria.register_peer("pneural-context", "http://localhost:8777")
+            except Exception:
+                pass
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Sync loop error")
 
 
 def create_app(config_override: PBConfig | None = None) -> FastAPI:

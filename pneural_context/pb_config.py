@@ -16,6 +16,7 @@ class PBConfig:
     port: int = 8777
     memoria_url: str = ""
     memoria_enabled: bool = False
+    sync_interval_seconds: float = 300.0
     decay_interval_seconds: float = 21600.0
     consolidation_interval_seconds: float = 21600.0
     archive_threshold: float = 0.1
@@ -42,6 +43,7 @@ class PBConfig:
             memoria_url=os.environ.get("PNEURAL_MEMORIA_URL", ""),
             memoria_enabled=os.environ.get("PNEURAL_MEMORIA_ENABLED", "").lower()
             in ("1", "true", "yes"),
+            sync_interval_seconds=float(os.environ.get("PNEURAL_SYNC_INTERVAL_SECONDS", "300")),
             decay_interval_seconds=float(os.environ.get("PNEURAL_DECAY_INTERVAL", "21600")),
             consolidation_interval_seconds=float(
                 os.environ.get("PNEURAL_CONSOLIDATION_INTERVAL", "21600")
