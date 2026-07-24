@@ -72,7 +72,8 @@ async def _ensure_turboquant(config: PBConfig) -> subprocess.Popen | None:
                     ssl=False,
                 ) as resp:
                     return resp.status == 200
-        except Exception:
+        except Exception as exc:
+            logger.debug("Turboquant health check failed: %s", exc)
             return False
 
     if await _check_llm():
@@ -173,7 +174,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "pneural-context", f"http://localhost:{config.port}"
             )
             logger.info("Registered as peer with memoria at %s", config.memoria_url)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Swallowed exception: %s", exc, exc_info=True)
             logger.warning("Failed to register as peer with memoria (will retry on sync)")
 
     logger.info("pneural-context server started on %s:%s", config.host, config.port)
@@ -185,7 +187,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.turboquant_proc.terminate()
         try:
             app.state.turboquant_proc.wait(timeout=5)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Swallowed exception: %s", exc, exc_info=True)
             app.state.turboquant_proc.kill()
         logger.info("Turboquant LLM stopped")
     if app.state.llm_client:
@@ -209,7 +212,8 @@ async def _decay_loop(interval: float, pool: asyncpg.Pool, config: PBConfig) -> 
             logger.info("Decay cycle: %s, archive: %s", result, archive_result)
         except asyncio.CancelledError:
             break
-        except Exception:
+        except Exception as exc:
+            logger.warning("Swallowed exception: %s", exc, exc_info=True)
             logger.exception("Decay loop error")
 
 
@@ -225,7 +229,8 @@ async def _consolidation_loop(
                 logger.info("Consolidation for %s: %s", project, result)
         except asyncio.CancelledError:
             break
-        except Exception:
+        except Exception as exc:
+            logger.warning("Swallowed exception: %s", exc, exc_info=True)
             logger.exception("Consolidation loop error")
 
 
@@ -247,15 +252,18 @@ async def _sync_loop(
                             inserted,
                             project,
                         )
-                except Exception:
+                except Exception as exc:
+                    logger.warning("Swallowed exception: %s", exc, exc_info=True)
                     logger.warning("Sync pull failed for project %s", project, exc_info=True)
             try:
                 await memoria.register_peer("pneural-context", f"http://localhost:{port}")
-            except Exception:
+            except Exception as exc:
+                logger.warning("Swallowed exception: %s", exc, exc_info=True)
                 pass
         except asyncio.CancelledError:
             break
-        except Exception:
+        except Exception as exc:
+            logger.warning("Swallowed exception: %s", exc, exc_info=True)
             logger.exception("Sync loop error")
 
 

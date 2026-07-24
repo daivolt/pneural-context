@@ -56,7 +56,8 @@ async def add_consolidated(
                     str(vec),
                     consol_id,
                 )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Swallowed exception: %s", exc, exc_info=True)
             logger.warning("Failed to embed consolidated entry %d", consol_id, exc_info=True)
     return consol_id
 

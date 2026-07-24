@@ -78,6 +78,7 @@ async def push_to_memoria(
             logger.info("Pushed memory to memoria for project %s", project)
             return True
         return False
-    except Exception:
+    except Exception as exc:
+        logger.warning("Swallowed exception: %s", exc, exc_info=True)
         logger.warning("Failed to push memory to memoria for project %s", project, exc_info=True)
         return False
