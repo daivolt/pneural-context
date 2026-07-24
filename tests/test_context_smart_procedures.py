@@ -64,34 +64,21 @@ async def test_smart_context_includes_matched_procedures(mock_request, mock_pool
 
 
 @pytest.mark.asyncio
-async def test_smart_context_excludes_low_similarity_procedures(mock_request, mock_pool_with_conn):
+async def test_smart_context_no_procedures_for_unrelated_conversation(
+    mock_request,
+    mock_pool_with_conn,
+):
     mock_pool, conn = mock_pool_with_conn
-    proc = {
-        "id": 1,
-        "project": "p",
-        "task_pattern": "deploy app",
-        "task_type": "ops",
-        "steps": ["build", "test", "deploy"],
-        "success_count": 5,
-        "fail_count": 1,
-        "reinforcement_score": 0.8,
-        "proven_by": [],
-        "created_at": 1700000000.0,
-        "retired": False,
-        "sim": 0.65,
-    }
-    conn.fetch = AsyncMock(return_value=[proc])
+    conn.fetch = AsyncMock(return_value=[])
 
     with patch.object(
         context_router.pb_db,
         "dedup_context_entries",
         new=AsyncMock(return_value=[]),
     ):
-        body = SmartContextRequest(project="p", conversation="unrelated topic")
+        body = SmartContextRequest(project="p", conversation="unrelated topic xyz")
         result = await context_router.get_smart_context(body, mock_request, mock_pool)
 
-    # search_procedures returns results; filtering by sim threshold happens in DB
-    # with threshold=0.7, the 0.65 result is excluded by the SQL query.
     assert result["procedures"] == []
 
 
