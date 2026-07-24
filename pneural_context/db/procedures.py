@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 
 import asyncpg
 
@@ -10,6 +11,83 @@ from . import pool as pool_mod
 from .pool import _get_pool
 
 logger = logging.getLogger("pneural_context.db.procedures")
+
+_STOPWORDS = frozenset(
+    {
+        "the",
+        "and",
+        "for",
+        "with",
+        "you",
+        "your",
+        "can",
+        "could",
+        "how",
+        "what",
+        "this",
+        "that",
+        "from",
+        "via",
+        "please",
+        "user",
+        "assistant",
+        "let",
+        "lets",
+        "ill",
+        "want",
+        "need",
+        "would",
+        "should",
+        "now",
+    }
+)
+
+
+def _norm(word: str) -> str:
+    # Light plural normalization: "sheets"->"sheet" but "class"->"class".
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _tokens(text: str) -> set[str]:
+    return {
+        _norm(w)
+        for w in re.findall(r"[a-z0-9]+", text.lower())
+        if len(w) > 2 and w not in _STOPWORDS
+    }
+
+
+async def match_procedures(
+    project: str,
+    conversation: str,
+    limit: int = 3,
+    min_overlap: int = 2,
+    min_ratio: float = 0.2,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    """Match procedures to conversation via token overlap.
+
+    Deterministic alternative to trigram search for long conversations:
+    pg_trgm similarity between a long conversation and a short task pattern
+    is inherently low, so we score by how many pattern tokens appear in the
+    conversation instead.
+    """
+    procs = await list_procedures(project, pool=pool)
+    conv_tokens = _tokens(conversation)
+    if not conv_tokens:
+        return []
+    scored: list[dict] = []
+    for p in procs:
+        pat_tokens = _tokens(p.get("task_pattern", ""))
+        if not pat_tokens:
+            continue
+        overlap = len(pat_tokens & conv_tokens)
+        ratio = overlap / len(pat_tokens)
+        if overlap >= min_overlap and ratio >= min_ratio:
+            scored.append({**p, "match_score": round(ratio, 3)})
+    scored.sort(key=lambda x: (-x["match_score"], -x.get("reinforcement_score", 0)))
+    return scored[:limit]
 
 
 async def add_procedure(

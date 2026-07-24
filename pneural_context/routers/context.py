@@ -154,18 +154,21 @@ async def get_smart_context(
     )
     matched_procedures: list[dict] = []
     try:
-        # Use a low trigram threshold so keyword-heavy tool patterns (e.g.
-        # "read or write Google Sheets, SharePoint Excel, spreadsheet") still
-        # surface when the user mentions sheets/sharepoint/spreadsheet.
-        matched_procedures = await procedures_db.search_procedures(
-            body.project,
-            body.conversation,
-            limit=3,
-            similarity_threshold=0.3,
-            pool=pool,
+        # Token overlap is the primary matcher: trigram similarity between a
+        # long conversation and a short task pattern is inherently too low.
+        matched_procedures = await procedures_db.match_procedures(
+            body.project, body.conversation, limit=3, pool=pool
         )
+        if not matched_procedures:
+            matched_procedures = await procedures_db.search_procedures(
+                body.project,
+                body.conversation,
+                limit=3,
+                similarity_threshold=0.3,
+                pool=pool,
+            )
     except Exception:
-        logger.warning("Failed to search procedures for smart context", exc_info=True)
+        logger.warning("Failed to match procedures for smart context", exc_info=True)
     return {
         "project": body.project,
         "source": "smart_dedup",
