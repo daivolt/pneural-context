@@ -232,7 +232,10 @@ async def reindex_table(
         if not rows:
             break
         col = expected_col
-        texts = [r[col] for r in rows]
+        # Cap text length for the embedding model's context window (~2k tokens
+        # for nomic-embed-text). Full content stays in the row; only the
+        # vector representation is truncated.
+        texts = [r[col][:2000] for r in rows]
         vectors = await pool_mod._embedding_client.embed_batch(texts)
         update_sql = f"UPDATE {table} SET embedding = $1 WHERE id = $2"
         for i, row in enumerate(rows):

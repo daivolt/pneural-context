@@ -120,6 +120,67 @@ async def get_context(
     }
 
 
+# Vector cosine-similarity floor for procedure injection. Calibrated against
+# nomic-embed-text on 5 probe conversations: relevant paraphrases score >= 0.58,
+# semantically-adjacent noise sits at 0.44-0.53, unrelated noise <= 0.39.
+# Precision is favored over recall (token + trigram layers remain as safety
+# nets) because context pollution causes hallucination.
+VECTOR_FLOOR = 0.55
+
+
+async def _match_procedures(
+    project: str,
+    conversation: str,
+    query_vec: list[float] | None,
+    limit: int = 3,
+    pool: asyncpg.Pool | None = None,
+) -> list[dict]:
+    """Hybrid procedure matcher, three layers:
+
+    1. Token overlap (deterministic, runs without embeddings) — primary.
+    2. Vector semantic search (when an embedding is available) gated by
+       VECTOR_FLOOR so paraphrases surface but noise stays out.
+    3. Trigram search as a last-resort fallback (short keyword queries).
+    """
+    merged: list[dict] = []
+    seen: set[int] = set()
+
+    def _add(hits: list[dict], source: str) -> None:
+        for p in hits:
+            pid = p.get("id")
+            if pid is not None and pid not in seen:
+                seen.add(pid)
+                merged.append({**p, "match_source": source})
+
+    try:
+        token_hits = await procedures_db.match_procedures(
+            project, conversation, limit=limit, pool=pool
+        )
+        _add(token_hits, "token")
+    except Exception:
+        logger.warning("Token procedure match failed", exc_info=True)
+
+    if query_vec:
+        try:
+            vec_hits = await pb_db.vector_search_procedures(
+                project, query_vec, limit=limit * 2, pool=pool
+            )
+            _add([h for h in vec_hits if h.get("similarity", 0.0) >= VECTOR_FLOOR], "vector")
+        except Exception:
+            logger.warning("Vector procedure search failed", exc_info=True)
+
+    if not merged:
+        try:
+            tri_hits = await procedures_db.search_procedures(
+                project, conversation, limit=limit, similarity_threshold=0.3, pool=pool
+            )
+            _add(tri_hits, "trigram")
+        except Exception:
+            logger.warning("Trigram procedure search failed", exc_info=True)
+
+    return merged[:limit]
+
+
 @router.post("/smart")
 async def get_smart_context(
     body: SmartContextRequest,
@@ -134,7 +195,13 @@ async def get_smart_context(
     if not body.conversation or not embedding_client:
         entries = await pb_db.get_memory_entries_full(body.project, pool=pool)
         filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
-        return {"project": body.project, "source": "full", "entries": filtered}
+        procedures = await _match_procedures(body.project, body.conversation, None, pool=pool)
+        return {
+            "project": body.project,
+            "source": "full",
+            "entries": filtered,
+            "procedures": procedures,
+        }
     try:
         conv_vec = await get_conversation_embedding(
             body.project, body.conversation, embedding_client
@@ -144,7 +211,13 @@ async def get_smart_context(
     if conv_vec is None:
         entries = await pb_db.get_memory_entries_full(body.project, pool=pool)
         filtered = [e for e in entries if e.get("strength", 1.0) >= threshold]
-        return {"project": body.project, "source": "full_fallback", "entries": filtered}
+        procedures = await _match_procedures(body.project, body.conversation, None, pool=pool)
+        return {
+            "project": body.project,
+            "source": "full_fallback",
+            "entries": filtered,
+            "procedures": procedures,
+        }
     deduped = await pb_db.dedup_context_entries(
         body.project,
         conv_vec,
@@ -152,23 +225,9 @@ async def get_smart_context(
         config.dedup_threshold_low,
         pool=pool,
     )
-    matched_procedures: list[dict] = []
-    try:
-        # Token overlap is the primary matcher: trigram similarity between a
-        # long conversation and a short task pattern is inherently too low.
-        matched_procedures = await procedures_db.match_procedures(
-            body.project, body.conversation, limit=3, pool=pool
-        )
-        if not matched_procedures:
-            matched_procedures = await procedures_db.search_procedures(
-                body.project,
-                body.conversation,
-                limit=3,
-                similarity_threshold=0.3,
-                pool=pool,
-            )
-    except Exception:
-        logger.warning("Failed to match procedures for smart context", exc_info=True)
+    matched_procedures = await _match_procedures(
+        body.project, body.conversation, conv_vec, pool=pool
+    )
     return {
         "project": body.project,
         "source": "smart_dedup",

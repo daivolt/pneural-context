@@ -133,3 +133,40 @@ async def test_smart_context_no_procedures_on_search_failure(mock_request, mock_
 
     assert result["procedures"] == []
     assert result["source"] == "smart_dedup"
+
+
+@pytest.mark.asyncio
+async def test_vector_layer_respects_floor(mock_pool):
+    proc = _proc("use browser automation, CDP, session manager, xvfb")
+    # Vector hit above floor -> included
+    mock_pool.fetch = AsyncMock(return_value=[{**proc, "similarity": 0.62}])
+    hits = await context_router._match_procedures(
+        "p", "unrelated phrasing with no token overlap zzz", [0.1] * 768, pool=mock_pool
+    )
+    assert len(hits) == 1
+    assert hits[0]["match_source"] == "vector"
+
+    # Vector hit below floor -> excluded
+    mock_pool.fetch = AsyncMock(return_value=[{**proc, "similarity": 0.40}])
+    hits = await context_router._match_procedures(
+        "p", "unrelated phrasing with no token overlap zzz", [0.1] * 768, pool=mock_pool
+    )
+    assert hits == []
+
+
+@pytest.mark.asyncio
+async def test_token_beats_vector_order(mock_pool):
+    sheets = _proc("read or write Google Sheets, SharePoint Excel")
+    browser = _proc("use browser automation, CDP, session manager, xvfb")
+    browser["id"] = 2
+    mock_pool.fetch = AsyncMock(
+        side_effect=[
+            [sheets, browser],  # list_procedures (token layer)
+            [{**browser, "similarity": 0.62}],  # vector_search_procedures
+        ]
+    )
+    hits = await context_router._match_procedures(
+        "p", "read my google sheets please", [0.1] * 768, pool=mock_pool
+    )
+    assert hits[0]["match_source"] == "token"
+    assert hits[1]["match_source"] == "vector"
