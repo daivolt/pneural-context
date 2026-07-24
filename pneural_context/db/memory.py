@@ -82,8 +82,7 @@ async def add_memory_entry(
                     str(vec),
                     entry_id,
                 )
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.warning("Failed to embed memory entry %d", entry_id, exc_info=True)
     return entry_id
 

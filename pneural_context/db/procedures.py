@@ -43,8 +43,7 @@ async def add_procedure(
                     str(vec),
                     proc_id,
                 )
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.warning("Failed to embed procedure %d", proc_id, exc_info=True)
     return proc_id
 

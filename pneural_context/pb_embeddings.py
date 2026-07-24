@@ -30,16 +30,14 @@ class EmbeddingClient:
     async def embed(self, text: str) -> list[float] | None:
         try:
             return await self._get_client().embed(text)
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.warning("Embedding failed for text (%d chars)", len(text), exc_info=True)
             return None
 
     async def embed_batch(self, texts: list[str]) -> list[list[float] | None]:
         try:
             return await self._get_client().embed_batch(texts)
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.warning("Batch embedding failed (%d texts)", len(texts), exc_info=True)
             return [None] * len(texts)
 
@@ -76,8 +74,7 @@ class OllamaEmbeddingClient:
             try:
                 vec = await self.embed(text)
                 results.append(vec)
-            except Exception as exc:
-                logger.warning("Swallowed exception: %s", exc, exc_info=True)
+            except Exception:
                 logger.warning("Ollama embed failed for text (%d chars)", len(text))
                 results.append(None)
         return results
@@ -123,8 +120,7 @@ class PythonEmbeddingClient:
         for i, vec in enumerate(vectors):
             try:
                 results.append(vec.tolist() if hasattr(vec, "tolist") else list(vec))
-            except Exception as exc:
-                logger.warning("Swallowed exception: %s", exc, exc_info=True)
+            except Exception:
                 logger.warning("Python embed failed at index %d", i)
                 results.append(None)
         return results
@@ -183,7 +179,6 @@ def create_embedding_client(config: Any) -> EmbeddingClient | None:
             dimensions=config.embed_dimensions,
             batch_size=config.embed_batch_size,
         )
-    except Exception as exc:
-        logger.warning("Swallowed exception: %s", exc, exc_info=True)
+    except Exception:
         logger.warning("Failed to create embedding client", exc_info=True)
         return None

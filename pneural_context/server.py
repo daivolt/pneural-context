@@ -174,8 +174,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "pneural-context", f"http://localhost:{config.port}"
             )
             logger.info("Registered as peer with memoria at %s", config.memoria_url)
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.warning("Failed to register as peer with memoria (will retry on sync)")
 
     logger.info("pneural-context server started on %s:%s", config.host, config.port)
@@ -212,8 +211,7 @@ async def _decay_loop(interval: float, pool: asyncpg.Pool, config: PBConfig) -> 
             logger.info("Decay cycle: %s, archive: %s", result, archive_result)
         except asyncio.CancelledError:
             break
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.exception("Decay loop error")
 
 
@@ -229,8 +227,7 @@ async def _consolidation_loop(
                 logger.info("Consolidation for %s: %s", project, result)
         except asyncio.CancelledError:
             break
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.exception("Consolidation loop error")
 
 
@@ -252,8 +249,7 @@ async def _sync_loop(
                             inserted,
                             project,
                         )
-                except Exception as exc:
-                    logger.warning("Swallowed exception: %s", exc, exc_info=True)
+                except Exception:
                     logger.warning("Sync pull failed for project %s", project, exc_info=True)
             try:
                 await memoria.register_peer("pneural-context", f"http://localhost:{port}")
@@ -262,8 +258,7 @@ async def _sync_loop(
                 pass
         except asyncio.CancelledError:
             break
-        except Exception as exc:
-            logger.warning("Swallowed exception: %s", exc, exc_info=True)
+        except Exception:
             logger.exception("Sync loop error")
 
 
