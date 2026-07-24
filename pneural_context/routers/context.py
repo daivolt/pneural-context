@@ -7,6 +7,7 @@ import asyncpg
 from fastapi import APIRouter, HTTPException, Request
 
 from .. import pb_db
+from ..db import procedures as procedures_db
 from ..deps import PoolDep
 from ..models.context import SmartContextRequest
 from ..pb_embeddings import get_conversation_embedding
@@ -151,10 +152,23 @@ async def get_smart_context(
         config.dedup_threshold_low,
         pool=pool,
     )
+    matched_procedures: list[dict] = []
+    try:
+        candidates = await procedures_db.search_procedures(
+            body.project,
+            body.conversation,
+            limit=3,
+            similarity_threshold=0.7,
+            pool=pool,
+        )
+        matched_procedures = [c for c in candidates if c.get("sim", 0.0) >= 0.7]
+    except Exception:
+        logger.warning("Failed to search procedures for smart context", exc_info=True)
     return {
         "project": body.project,
         "source": "smart_dedup",
         "dedup_threshold_high": config.dedup_threshold_high,
         "dedup_threshold_low": config.dedup_threshold_low,
         "entries": deduped,
+        "procedures": matched_procedures,
     }
